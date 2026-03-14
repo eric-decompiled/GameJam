@@ -20,6 +20,7 @@ interface LevelData {
     worldWidth: number;
     worldHeight: number;
     spawn: { x: number; y: number };
+    victory?: { x: number; y: number };
     platforms: PlatformData[];
     movingPlatforms: MovingPlatformData[];
 }
@@ -38,6 +39,16 @@ export class LevelManager {
             this.buildLevel();
         } catch (error) {
             console.error('Level loading error:', error);
+            this.loadDefaultLevel();
+        }
+    }
+
+    loadFromJSON(json: string): void {
+        try {
+            this.currentLevel = JSON.parse(json);
+            this.buildLevel();
+        } catch (error) {
+            console.error('Failed to parse level JSON:', error);
             this.loadDefaultLevel();
         }
     }
@@ -95,6 +106,13 @@ export class LevelManager {
             return { ...this.currentLevel.spawn };
         }
         return { x: 100, y: 500 };
+    }
+
+    getVictoryPoint(): { x: number; y: number } | null {
+        if (this.currentLevel && this.currentLevel.victory) {
+            return { ...this.currentLevel.victory };
+        }
+        return null;
     }
 
     getWorldBounds(): { width: number; height: number } {

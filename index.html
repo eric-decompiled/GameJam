@@ -10,10 +10,20 @@
     <div class="game-container">
         <canvas id="gameCanvas"></canvas>
         <div id="debugOverlay"></div>
-        <div class="controls">
-            <h3>Controls</h3>
-            <span><kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> Move</span>
-            <span><kbd>Space</kbd> / <kbd>↑</kbd> / <kbd>W</kbd> Jump</span>
+        <div class="bottom-bar">
+            <a href="/editor.html" class="edit-btn">Edit</a>
+            <div class="controls">
+                <h3>Controls</h3>
+                <span><kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> Move</span>
+                <span><kbd>Space</kbd> / <kbd>↑</kbd> / <kbd>W</kbd> Jump</span>
+                <div class="level-select">
+                    <label for="levelSelect">Level:</label>
+                    <select id="levelSelect">
+                        <option value="level1">Level 1</option>
+                        <option value="tester">Tester</option>
+                    </select>
+                </div>
+            </div>
         </div>
     </div>
     <script type="module" src="src/main.ts"></script>

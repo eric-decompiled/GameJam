@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platformer - Level Editor</title>
+    <link rel="stylesheet" href="css/editor.css">
+</head>
+<body>
+    <div class="editor-container">
+        <div class="toolbar" id="toolbar"></div>
+        <div class="main-area">
+            <div class="canvas-container">
+                <canvas id="editorCanvas"></canvas>
+            </div>
+            <div class="side-panel">
+                <div class="panel" id="levelPanel"></div>
+                <div class="panel" id="propertiesPanel"></div>
+                <div class="panel" id="actionsPanel"></div>
+            </div>
+        </div>
+        <div class="status-bar" id="statusBar">Ready</div>
+    </div>
+    <script type="module" src="src/editor/main.ts"></script>
+</body>
+</html>

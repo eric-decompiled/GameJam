@@ -8,6 +8,7 @@ import { LevelManager } from '../levels/LevelManager';
 import { Player } from '../entities/Player';
 import { Entity } from '../entities/Entity';
 import { Platform } from '../entities/Platform';
+import { Victory } from '../entities/Victory';
 
 export class Game {
     private renderer: Renderer;
@@ -23,6 +24,8 @@ export class Game {
     private running: boolean = false;
     private deathY: number = 0;
     private deaths: number = 0;
+    private victoryPoint: { x: number; y: number } | null = null;
+    private hasWon: boolean = false;
 
     constructor(canvas: HTMLCanvasElement) {
         this.renderer = new Renderer(canvas);
@@ -37,8 +40,17 @@ export class Game {
         this.debug.setDeathsCallback(() => this.deaths);
     }
 
-    async init(): Promise<void> {
-        await this.levelManager.loadLevel('level1');
+    async init(levelName: string = 'level1'): Promise<void> {
+        await this.levelManager.loadLevel(levelName);
+        this.setupLevel();
+    }
+
+    async initFromJSON(json: string): Promise<void> {
+        this.levelManager.loadFromJSON(json);
+        this.setupLevel();
+    }
+
+    private setupLevel(): void {
 
         this.entities = this.levelManager.getEntities();
 
@@ -50,6 +62,12 @@ export class Game {
         const bounds = this.levelManager.getWorldBounds();
         this.camera.setWorldBounds(bounds.width, bounds.height);
         this.deathY = bounds.height + 200; // Fall 200px below world to die
+        this.victoryPoint = this.levelManager.getVictoryPoint();
+
+        if (this.victoryPoint) {
+            const victoryEntity = new Victory(this.victoryPoint.x, this.victoryPoint.y);
+            this.entities.push(victoryEntity);
+        }
 
         for (const entity of this.entities) {
             entity.createMesh();
@@ -98,6 +116,17 @@ export class Game {
             this.respawnPlayer();
         }
 
+        // Check for victory
+        if (!this.hasWon && this.victoryPoint) {
+            const dx = this.player.centerX - this.victoryPoint.x;
+            const dy = this.player.centerY - this.victoryPoint.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 40) {
+                this.hasWon = true;
+                this.showVictory();
+            }
+        }
+
         this.camera.follow(this.player, dt);
 
         // Clear per-frame input states
@@ -120,6 +149,25 @@ export class Game {
         return this.deaths;
     }
 
+    private showVictory(): void {
+        const overlay = document.createElement('div');
+        overlay.className = 'victory-overlay';
+        overlay.innerHTML = `
+            <div class="victory-content">
+                <h1>Victory!</h1>
+                <p>Deaths: ${this.deaths}</p>
+                <button id="playAgain">Play Again</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        document.getElementById('playAgain')?.addEventListener('click', () => {
+            overlay.remove();
+            this.hasWon = false;
+            this.respawnPlayer();
+        });
+    }
+
     private render(): void {
         for (const entity of this.entities) {
             if (entity.active) {
@@ -133,5 +181,38 @@ export class Game {
 
     stop(): void {
         this.running = false;
+    }
+
+    async loadLevel(levelName: string): Promise<void> {
+        // Remove old entities from scene
+        for (const entity of this.entities) {
+            entity.removeFromScene(this.renderer);
+        }
+
+        await this.levelManager.loadLevel(levelName);
+        this.entities = this.levelManager.getEntities();
+
+        const spawn = this.levelManager.getSpawnPoint();
+        this.player = new Player(spawn.x, spawn.y);
+        this.entities.push(this.player);
+        this.debug.setPlayer(this.player);
+
+        const bounds = this.levelManager.getWorldBounds();
+        this.camera.setWorldBounds(bounds.width, bounds.height);
+        this.deathY = bounds.height + 200;
+        this.victoryPoint = this.levelManager.getVictoryPoint();
+        this.hasWon = false;
+
+        if (this.victoryPoint) {
+            const victoryEntity = new Victory(this.victoryPoint.x, this.victoryPoint.y);
+            this.entities.push(victoryEntity);
+        }
+
+        for (const entity of this.entities) {
+            entity.createMesh();
+            entity.addToScene(this.renderer);
+        }
+
+        this.deaths = 0;
     }
 }

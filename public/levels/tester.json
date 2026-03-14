@@ -1,0 +1,40 @@
+{
+  "name": "Tester",
+  "worldWidth": 2000,
+  "worldHeight": 800,
+  "spawn": {
+    "x": 100,
+    "y": 600
+  },
+  "victory": {
+    "x": 1000,
+    "y": 512
+  },
+  "platforms": [
+    {
+      "x": 0,
+      "y": 700,
+      "width": 400,
+      "height": 100
+    },
+    {
+      "x": 352,
+      "y": 512,
+      "width": 192,
+      "height": 64
+    },
+    {
+      "x": 288,
+      "y": 352,
+      "width": 448,
+      "height": 32
+    },
+    {
+      "x": 416,
+      "y": 384,
+      "width": 704,
+      "height": 32
+    }
+  ],
+  "movingPlatforms": []
+}

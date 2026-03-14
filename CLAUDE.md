@@ -27,6 +27,20 @@ A 3D platformer game built with TypeScript and Three.js.
 ### Input
 - `InputManager.clear()` must be called each frame to reset justPressed/justReleased states
 
+### 3D Models & Animation
+- Models stored in `public/models/` (GLB format)
+- **Platform**: `Platform_mk1.glb` - scaled to match platform dimensions
+- **Player animations**: `idle.glb`, `Walk.glb`, `run.glb`, `jump.glb`
+  - Walk animation plays reversed (`timeScale = -1`)
+  - Model rotated -90° Y to face +X by default
+  - Model offset -30px Y to align feet with ground
+  - Model scaled 2x for visibility (larger than hitbox)
+- Animation thresholds:
+  - Idle: speed <= 10
+  - Walk: speed > 10
+  - Run: speed > 70% of MAX_SPEED (210)
+  - Jump: when not grounded
+
 ## Commands
 
 ```bash
