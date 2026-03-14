@@ -18,7 +18,7 @@ import { HostSession } from '../network/HostSession';
 import { ClientSession } from '../network/ClientSession';
 import { MultiplayerUI } from './MultiplayerUI';
 import { AudioManager } from './AudioManager';
-import type { PlayerState } from '../network/Protocol';
+import type { PlayerState, WorldState } from '../network/Protocol';
 
 export type GameMode = 'single' | 'host' | 'client';
 
@@ -646,6 +646,12 @@ export class Game {
                 if (remoteInput) {
                     player.handleRemoteInput(remoteInput);
                 }
+                // Use client's reported position for accurate collision detection
+                const clientPos = this.hostSession?.getClientPosition();
+                if (clientPos) {
+                    player.position.x = clientPos.x;
+                    player.position.y = clientPos.y;
+                }
             } else {
                 // Local input
                 player.handleInput(this.input);
@@ -661,7 +667,11 @@ export class Game {
 
         // Run physics for each player
         for (const player of this.players) {
-            this.physics.update(player, platforms, dt);
+            // Skip physics for remote players - client handles their physics
+            // Host only uses their reported position for collision detection
+            if (!player.isRemote) {
+                this.physics.update(player, platforms, dt);
+            }
 
             // Check for death
             if (player.position.y > this.deathY) {
@@ -754,7 +764,8 @@ export class Game {
             if (this.stateBroadcastTimer >= this.STATE_BROADCAST_INTERVAL) {
                 this.stateBroadcastTimer = 0;
                 const states = this.players.map(p => p.getState());
-                this.hostSession?.broadcastState(states);
+                const worldState = this.getWorldState();
+                this.hostSession?.broadcastState(states, worldState);
             }
         }
 
@@ -765,14 +776,23 @@ export class Game {
     }
 
     private updateAsClient(dt: number): void {
-        // Apply received state from host
-        const states = this.clientSession?.getLatestState();
-        if (states) {
-            for (const state of states) {
-                const player = this.players.find(p => p.playerId === state.id);
-                if (player) {
-                    player.applyState(state);
-                }
+        const platforms = this.entities.filter(e => e.hasTag('platform')) as Platform[];
+        const localPlayer = this.players.find(p => !p.isRemote);
+        const remotePlayer = this.players.find(p => p.isRemote);
+
+        // Run local player prediction (optimistic updates)
+        if (localPlayer) {
+            localPlayer.handleInput(this.input);
+            localPlayer.update(dt);
+            this.physics.update(localPlayer, platforms, dt);
+
+            // Predict death (will be corrected by server if wrong)
+            if (localPlayer.position.y > this.deathY) {
+                const spawn = this.levelManager.getSpawnPoint();
+                const offsetX = (localPlayer.playerId - (this.players.length - 1) / 2) * 50;
+                localPlayer.position.set(spawn.x + offsetX, spawn.y);
+                localPlayer.velocity.set(0, 0);
+                localPlayer.grounded = false;
             }
         }
 
@@ -783,17 +803,144 @@ export class Game {
             }
         }
 
-        // Update player animations based on received state
-        for (const player of this.players) {
-            player.update(dt);
+        // Apply received state from host
+        const networkState = this.clientSession?.getLatestState();
+        if (networkState) {
+            // Apply player states
+            for (const state of networkState.players) {
+                if (remotePlayer && state.id === remotePlayer.playerId) {
+                    // Remote player: apply state directly
+                    remotePlayer.applyState(state);
+                } else if (localPlayer && state.id === localPlayer.playerId) {
+                    // Local player: reconcile prediction with server state
+                    this.reconcileLocalPlayer(localPlayer, state);
+                }
+            }
+
+            // Apply world state (coins, chest, monsters, etc.)
+            if (networkState.world) {
+                this.applyWorldState(networkState.world);
+            }
+        }
+
+        // Update remote player animations
+        if (remotePlayer) {
+            remotePlayer.update(dt);
         }
 
         // Camera follows all players
         this.camera.followMultiple(this.players, dt);
 
-        // Send local input to host
-        if (this.networkManager?.isConnected) {
-            this.clientSession?.sendInput(this.input.getInputState());
+        // Send local input to host (including position for collision detection)
+        if (this.networkManager?.isConnected && localPlayer) {
+            this.clientSession?.sendInput(
+                this.input.getInputState(),
+                localPlayer.position.x,
+                localPlayer.position.y
+            );
+        }
+    }
+
+    private reconcileLocalPlayer(player: Player, state: PlayerState): void {
+        // Calculate difference between predicted and server state
+        const dx = state.x - player.position.x;
+        const dy = state.y - player.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        const SNAP_THRESHOLD = 150; // Large differences = snap (respawn, teleport)
+        const CORRECTION_THRESHOLD = 5; // Small differences = ignore
+        const LERP_FACTOR = 0.1; // Smooth correction rate
+
+        if (distance > SNAP_THRESHOLD) {
+            // Snap to server position (respawn or major desync)
+            player.applyState(state);
+        } else if (distance > CORRECTION_THRESHOLD) {
+            // Smoothly correct toward server position
+            player.position.x += dx * LERP_FACTOR;
+            player.position.y += dy * LERP_FACTOR;
+            player.velocity.x += (state.vx - player.velocity.x) * LERP_FACTOR;
+            player.velocity.y += (state.vy - player.velocity.y) * LERP_FACTOR;
+            // Snap grounded state to avoid physics glitches
+            player.grounded = state.grounded;
+        }
+        // If within CORRECTION_THRESHOLD, trust local prediction
+    }
+
+    private getWorldState(): WorldState {
+        const collectedCoins: number[] = [];
+        this.coins.forEach((coin, index) => {
+            if (!coin.active) collectedCoins.push(index);
+        });
+
+        const deadMonsters: number[] = [];
+        this.monsters.forEach((monster, index) => {
+            if (!monster.active) deadMonsters.push(index);
+        });
+
+        return {
+            collectedCoins,
+            coinsCollected: this.coinsCollected,
+            escapeMode: this.chestActivated,
+            chestX: this.chest?.position.x,
+            chestY: this.chest?.position.y,
+            chestBeingCarried: this.chest?.isBeingCarried() ?? false,
+            deadMonsters,
+            deaths: [...this.deaths]
+        };
+    }
+
+    private applyWorldState(world: WorldState): void {
+        // Sync collected coins
+        for (const index of world.collectedCoins) {
+            if (this.coins[index] && this.coins[index].active) {
+                this.coins[index].collect();
+            }
+        }
+        this.coinsCollected = world.coinsCollected;
+        this.updateCoinHud();
+
+        // Sync dead monsters
+        for (const index of world.deadMonsters) {
+            if (this.monsters[index] && this.monsters[index].active) {
+                this.monsters[index].kill();
+            }
+        }
+
+        // Sync escape mode
+        if (world.escapeMode && !this.chestActivated) {
+            this.chestActivated = true;
+            // Visual changes
+            this.renderer.setBackgroundColor(0x8b2500, 0x4a2020);
+            AudioManager.stopMusic(0.3);
+            AudioManager.playMusic('escape_music', 0.6);
+            if (this.returnBase) {
+                this.returnBase.show();
+            }
+            // Spawn monsters on client (same as host does)
+            this.spawnMonsters();
+            for (const monster of this.monsters) {
+                monster.createMesh();
+                monster.addToScene(this.renderer);
+            }
+            if (this.monsters.length > 0) {
+                AudioManager.play('monster_roar', 0.7);
+            }
+        }
+
+        // Spawn chest on client if needed (when all coins collected)
+        if (!this.chest && world.chestX !== undefined && world.chestY !== undefined && this.victoryPoint) {
+            this.spawnChest();
+        }
+
+        // Sync chest position and state
+        if (this.chest && world.chestX !== undefined && world.chestY !== undefined) {
+            this.chest.position.x = world.chestX;
+            this.chest.position.y = world.chestY;
+        }
+
+        // Sync death counts
+        if (world.deaths) {
+            this.deaths = [...world.deaths];
         }
     }
 

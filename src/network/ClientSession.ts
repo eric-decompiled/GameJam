@@ -5,6 +5,7 @@ import {
     StateMessage,
     InputState,
     PlayerState,
+    WorldState,
     isStateMessage
 } from './Protocol';
 
@@ -12,6 +13,7 @@ export class ClientSession {
     private networkManager: NetworkManager;
     private inputSeq: number = 0;
     private latestState: PlayerState[] | null = null;
+    private latestWorldState: WorldState | null = null;
     private lastStateSeq: number = -1;
     private onStartCallback: ((level: string) => void) | null = null;
     private onVictoryCallback: ((playerId: number) => void) | null = null;
@@ -49,21 +51,29 @@ export class ClientSession {
         // Only accept newer states
         if (message.seq > this.lastStateSeq) {
             this.latestState = message.players;
+            this.latestWorldState = message.world || null;
             this.lastStateSeq = message.seq;
         }
     }
 
-    getLatestState(): PlayerState[] | null {
-        const state = this.latestState;
+    getLatestState(): { players: PlayerState[], world: WorldState | null } | null {
+        if (!this.latestState) return null;
+        const result = {
+            players: this.latestState,
+            world: this.latestWorldState
+        };
         this.latestState = null;
-        return state;
+        this.latestWorldState = null;
+        return result;
     }
 
-    sendInput(input: InputState): void {
+    sendInput(input: InputState, x?: number, y?: number): void {
         const message: InputMessage = {
             type: 'input',
             keys: input,
-            seq: this.inputSeq++
+            seq: this.inputSeq++,
+            x,
+            y
         };
         this.networkManager.send(message);
     }
