@@ -253,6 +253,36 @@ export class MultiplayerUI {
                 font-weight: bold;
                 margin-top: 8px;
             }
+
+            .mp-credits-link {
+                position: absolute;
+                bottom: 16px;
+                right: 16px;
+                color: #888;
+                font-size: 12px;
+                cursor: pointer;
+                text-decoration: underline;
+            }
+
+            .mp-credits-link:hover {
+                color: #aaa;
+            }
+
+            .mp-credits-content {
+                text-align: left;
+                color: #ccc;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+
+            .mp-credits-content a {
+                color: #4a90d9;
+                text-decoration: none;
+            }
+
+            .mp-credits-content a:hover {
+                text-decoration: underline;
+            }
         `;
         document.head.appendChild(style);
     }
@@ -273,6 +303,7 @@ export class MultiplayerUI {
                 <button class="mp-button mp-button-success" id="mp-host">Host Game</button>
                 <button class="mp-button mp-button-secondary" id="mp-join">Join Game</button>
             </div>
+            <span class="mp-credits-link" id="mp-credits">Credits</span>
         `;
 
         this.container.appendChild(overlay);
@@ -288,6 +319,41 @@ export class MultiplayerUI {
 
         document.getElementById('mp-join')?.addEventListener('click', () => {
             this.showJoinScreen();
+        });
+
+        document.getElementById('mp-credits')?.addEventListener('click', () => {
+            this.showCredits();
+        });
+    }
+
+    showCredits(): void {
+        this.removeOverlay();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'mp-overlay';
+        overlay.innerHTML = `
+            <div class="mp-panel">
+                <h1 class="mp-title">Credits</h1>
+                <div class="mp-credits-content">
+                    <p><strong>Music</strong></p>
+                    <p>Menu music by Cleyton Kauffman<br>
+                    <a href="https://soundcloud.com/cleytonkauffman" target="_blank">soundcloud.com/cleytonkauffman</a></p>
+                    <br>
+                    <p>Adventure music by <a href="https://pixabay.com/users/hitslab-47305729/" target="_blank">Ievgen Poltavskyi</a><br>
+                    from <a href="https://pixabay.com/music/" target="_blank">Pixabay</a></p>
+                    <br>
+                    <p>Battle theme by Cynic Music<br>
+                    <a href="https://cynicmusic.com" target="_blank">cynicmusic.com</a> | <a href="https://pixelsphere.org" target="_blank">pixelsphere.org</a></p>
+                </div>
+                <button class="mp-button mp-button-secondary" id="mp-back">Back</button>
+            </div>
+        `;
+
+        this.container.appendChild(overlay);
+        this.currentOverlay = overlay;
+
+        document.getElementById('mp-back')?.addEventListener('click', () => {
+            this.showMainMenu();
         });
     }
 
@@ -365,18 +431,10 @@ export class MultiplayerUI {
         scene.add(directionalLight);
 
         try {
-            // Use preloaded model if available, otherwise load fresh
-            let model: THREE.Group;
-            let animations: THREE.AnimationClip[];
-
-            if (preloadedModels.has(modelPath)) {
-                model = SkeletonUtils.clone(preloadedModels.get(modelPath)!) as THREE.Group;
-                animations = preloadedAnimations.get(modelPath) || [];
-            } else {
-                const gltf = await gltfLoader.loadAsync(modelPath);
-                model = gltf.scene;
-                animations = gltf.animations;
-            }
+            // Always load fresh for character select to avoid clone issues
+            const gltf = await gltfLoader.loadAsync(modelPath);
+            const model = gltf.scene;
+            const animations = gltf.animations;
 
             // Scale and position model
             const box = new THREE.Box3().setFromObject(model);
@@ -390,8 +448,8 @@ export class MultiplayerUI {
             model.position.y = -box.min.y;
             model.position.z = -center.z;
 
-            // Rotate to face camera
-            model.rotation.y = 0;
+            // Rotate to face camera (same as Player.ts)
+            model.rotation.y = -Math.PI / 2;
 
             scene.add(model);
 

@@ -12,10 +12,13 @@ import { Ladder } from '../entities/Ladder';
 import { Victory } from '../entities/Victory';
 import { Monster } from '../entities/Monster';
 import { Coin } from '../entities/Coin';
+import { Chest } from '../entities/Chest';
+import { ReturnBase } from '../entities/ReturnBase';
 import { NetworkManager } from '../network/NetworkManager';
 import { HostSession } from '../network/HostSession';
 import { ClientSession } from '../network/ClientSession';
 import { MultiplayerUI } from './MultiplayerUI';
+import { AudioManager } from './AudioManager';
 import type { PlayerState } from '../network/Protocol';
 
 export type GameMode = 'single' | 'host' | 'client';
@@ -33,13 +36,20 @@ export class Game {
     private coins: Coin[] = [];
     private coinsCollected: number = 0;
     private coinHud: HTMLElement | null = null;
+    private chestHud: HTMLElement | null = null;
+    private muteButton: HTMLElement | null = null;
     private lastTime: number = 0;
     private accumulator: number = 0;
     private running: boolean = false;
     private deathY: number = 0;
     private deaths: number[] = [0, 0];
     private victoryPoint: { x: number; y: number } | null = null;
+    private spawnPoint: { x: number; y: number } | null = null;
+    private chest: Chest | null = null;
+    private returnBase: ReturnBase | null = null;
     private hasWon: boolean = false;
+    private levelTime: number = 0;
+    private chestActivated: boolean = false;
 
     // Multiplayer
     private mode: GameMode = 'single';
@@ -51,6 +61,8 @@ export class Game {
     private readonly STATE_BROADCAST_INTERVAL: number = 1000 / 20; // 20Hz
     private currentLevelName: string = 'level1';
     private selectedCharacterId: number = 0;
+    private audioReady: boolean = false;
+    private musicStarted: boolean = false;
 
     constructor(canvas: HTMLCanvasElement) {
         this.renderer = new Renderer(canvas);
@@ -67,6 +79,62 @@ export class Game {
 
         this.setupMultiplayerUI();
         this.createCoinHud();
+        this.createChestHud();
+        this.createMuteButton();
+        this.initAudio();
+    }
+
+    private async initAudio(): Promise<void> {
+        await AudioManager.preload('monster_roar', `${import.meta.env.BASE_URL}audio/monster_roar.mp3`);
+        await AudioManager.preload('menu_music', `${import.meta.env.BASE_URL}audio/menu_music.wav`);
+        await AudioManager.preload('level_music', `${import.meta.env.BASE_URL}audio/level_music.mp3`);
+        await AudioManager.preload('escape_music', `${import.meta.env.BASE_URL}audio/escape_music.mp3`);
+        this.audioReady = true;
+    }
+
+    private createMuteButton(): void {
+        this.muteButton = document.createElement('button');
+        this.muteButton.id = 'mute-button';
+        this.muteButton.style.cssText = `
+            position: fixed;
+            bottom: 16px;
+            left: 16px;
+            width: 44px;
+            height: 44px;
+            background: rgba(0, 0, 0, 0.6);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 24px;
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        `;
+        this.muteButton.innerHTML = '🔊';
+        this.muteButton.title = 'Toggle sound';
+
+        this.muteButton.addEventListener('mouseenter', () => {
+            if (this.muteButton) this.muteButton.style.background = 'rgba(0, 0, 0, 0.8)';
+        });
+        this.muteButton.addEventListener('mouseleave', () => {
+            if (this.muteButton) this.muteButton.style.background = 'rgba(0, 0, 0, 0.6)';
+        });
+
+        this.muteButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            AudioManager.toggleMute();
+            this.updateMuteButton();
+        });
+
+        document.body.appendChild(this.muteButton);
+    }
+
+    private updateMuteButton(): void {
+        if (this.muteButton) {
+            this.muteButton.innerHTML = AudioManager.isMuted ? '🔇' : '🔊';
+        }
     }
 
     private createCoinHud(): void {
@@ -102,6 +170,67 @@ export class Game {
         }
     }
 
+    private createChestHud(): void {
+        this.chestHud = document.createElement('div');
+        this.chestHud.id = 'chest-hud';
+        this.chestHud.style.cssText = `
+            position: fixed;
+            top: 50px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            font-family: sans-serif;
+            display: none;
+            z-index: 100;
+        `;
+        document.body.appendChild(this.chestHud);
+    }
+
+    private updateChestHud(): void {
+        if (this.chestHud && this.chest) {
+            // Only show HUD if any player is within ~400px of chest
+            const SHOW_DISTANCE = 400;
+            let anyPlayerClose = false;
+            for (const player of this.players) {
+                const dx = player.centerX - this.chest.centerX;
+                const dy = player.centerY - this.chest.centerY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < SHOW_DISTANCE) {
+                    anyPlayerClose = true;
+                    break;
+                }
+            }
+
+            if (!anyPlayerClose) {
+                this.chestHud.style.display = 'none';
+                return;
+            }
+
+            const carrierCount = this.chest.getCarrierCount();
+            const requiredCarriers = this.chest.getRequiredCarriers();
+            const isCarrying = this.chest.isBeingCarried();
+
+            if (isCarrying) {
+                this.chestHud.style.color = '#4ad97a';
+                this.chestHud.textContent = 'Carrying chest! Return to spawn';
+            } else {
+                this.chestHud.style.color = '#d9d94a';
+                this.chestHud.textContent = `Chest: ${carrierCount}/${requiredCarriers} players nearby`;
+            }
+            this.chestHud.style.display = 'block';
+        }
+    }
+
+    private hideChestHud(): void {
+        if (this.chestHud) {
+            this.chestHud.style.display = 'none';
+        }
+    }
+
     private setupMultiplayerUI(): void {
         this.multiplayerUI.setCallbacks({
             onSinglePlayer: (characterId) => this.startSinglePlayer(characterId),
@@ -112,12 +241,33 @@ export class Game {
 
     showMultiplayerMenu(): void {
         this.hideCoinHud();
+        this.hideChestHud();
+        this.musicStarted = false;
         this.multiplayerUI.showMainMenu();
+
+        // Start music on first user interaction (required by browser autoplay policy)
+        const startMusic = async () => {
+            if (this.musicStarted) return;
+            this.musicStarted = true;
+
+            // Ensure audio is loaded
+            if (!this.audioReady) {
+                await AudioManager.preload('menu_music', `${import.meta.env.BASE_URL}audio/menu_music.wav`);
+            }
+            AudioManager.playMusic('menu_music', 0.8);
+            document.removeEventListener('click', startMusic);
+            document.removeEventListener('keydown', startMusic);
+        };
+
+        document.addEventListener('click', startMusic, { once: false });
+        document.addEventListener('keydown', startMusic, { once: false });
     }
 
     private async startSinglePlayer(characterId: number): Promise<void> {
         this.mode = 'single';
         this.selectedCharacterId = characterId;
+        AudioManager.stopMusic();
+        AudioManager.playMusic('level_music', 0.5);
         await this.init(this.currentLevelName);
     }
 
@@ -196,6 +346,8 @@ export class Game {
 
     private async startMultiplayerGame(): Promise<void> {
         // Host starts the game
+        AudioManager.stopMusic();
+        AudioManager.playMusic('level_music', 0.5);
         this.multiplayerUI.removeOverlay();
         this.multiplayerUI.showConnectionStatus(true, true);
         this.hostSession?.sendStart(this.currentLevelName);
@@ -220,6 +372,8 @@ export class Game {
     }
 
     private async initAsClient(levelName: string): Promise<void> {
+        AudioManager.stopMusic();
+        AudioManager.playMusic('level_music', 0.5);
         this.currentLevelName = levelName;
         this.multiplayerUI.showConnectionStatus(true, false);
         await this.levelManager.loadLevel(levelName);
@@ -231,23 +385,34 @@ export class Game {
         this.players = [];
         this.monsters = [];
         this.coins = [];
+        this.chest = null;
+        this.chestActivated = false;
+        this.renderer.setBackgroundColor(0x6ab0de, 0x4a7a4a); // Reset to normal colors
         this.coinsCollected = 0;
+        this.hasWon = false;
+        this.levelTime = 0;
         this.updateCoinHud();
 
         const spawn = this.levelManager.getSpawnPoint();
+        this.spawnPoint = { x: spawn.x, y: spawn.y };
         const player = new Player(spawn.x, spawn.y, this.selectedCharacterId, false);
         this.players.push(player);
         this.entities.push(player);
         this.debug.setPlayer(player);
+
+        // Create return base at spawn point
+        this.returnBase = new ReturnBase(spawn.x, spawn.y);
+        this.entities.push(this.returnBase);
 
         const bounds = this.levelManager.getWorldBounds();
         this.camera.setWorldBounds(bounds.width, bounds.height);
         this.deathY = bounds.height + 200;
         this.victoryPoint = this.levelManager.getVictoryPoint();
 
+        // Create chest at victory point instead of victory marker
         if (this.victoryPoint) {
-            const victoryEntity = new Victory(this.victoryPoint.x, this.victoryPoint.y);
-            this.entities.push(victoryEntity);
+            this.chest = new Chest(this.victoryPoint.x, this.victoryPoint.y);
+            this.entities.push(this.chest);
         }
 
         // Spawn monsters and coins
@@ -302,12 +467,21 @@ export class Game {
         this.players = [];
         this.monsters = [];
         this.coins = [];
+        this.chest = null;
+        this.chestActivated = false;
+        this.renderer.setBackgroundColor(0x6ab0de, 0x4a7a4a); // Reset to normal colors
         this.coinsCollected = 0;
+        this.levelTime = 0;
         this.updateCoinHud();
         this.deaths = [0, 0];
         this.hasWon = false;
 
         const spawn = this.levelManager.getSpawnPoint();
+        this.spawnPoint = { x: spawn.x, y: spawn.y };
+
+        // Create return base at spawn point
+        this.returnBase = new ReturnBase(spawn.x, spawn.y);
+        this.entities.push(this.returnBase);
 
         // Create players with slight horizontal offset
         for (let i = 0; i < playerCount; i++) {
@@ -329,9 +503,10 @@ export class Game {
         this.deathY = bounds.height + 200;
         this.victoryPoint = this.levelManager.getVictoryPoint();
 
+        // Create chest at victory point instead of victory marker
         if (this.victoryPoint) {
-            const victoryEntity = new Victory(this.victoryPoint.x, this.victoryPoint.y);
-            this.entities.push(victoryEntity);
+            this.chest = new Chest(this.victoryPoint.x, this.victoryPoint.y);
+            this.entities.push(this.chest);
         }
 
         // Spawn monsters and coins
@@ -369,11 +544,19 @@ export class Game {
     private update(dt: number): void {
         if (this.players.length === 0) return;
 
+        // Track level time
+        if (!this.hasWon) {
+            this.levelTime += dt;
+        }
+
         if (this.mode === 'client') {
             this.updateAsClient(dt);
         } else {
             this.updateAsHostOrSingle(dt);
         }
+
+        // Update chest HUD
+        this.updateChestHud();
 
         // Clear per-frame input states
         this.input.clear();
@@ -413,19 +596,7 @@ export class Game {
                 this.respawnPlayer(player);
             }
 
-            // Check for victory (per-player)
-            if (!player.hasReachedVictory && this.victoryPoint) {
-                const dx = player.centerX - this.victoryPoint.x;
-                const dy = player.centerY - this.victoryPoint.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < 40) {
-                    player.hasReachedVictory = true;
-                    if (this.mode === 'host') {
-                        this.hostSession?.sendVictory(player.playerId);
-                    }
-                    this.checkAllPlayersVictory();
-                }
-            }
+            // Old per-player victory removed - now using chest mechanic
 
             // Check monster collisions
             for (const monster of this.monsters) {
@@ -452,6 +623,43 @@ export class Game {
         // Update monsters - check for players on their platforms
         for (const monster of this.monsters) {
             monster.checkForPlayers(this.players);
+        }
+
+        // Update chest - check if players can carry it and run physics
+        if (this.chest && !this.hasWon) {
+            this.chest.checkCarriers(this.players);
+
+            // Update return base glow based on chest carrying state
+            if (this.returnBase) {
+                this.returnBase.setActive(this.chest.isBeingCarried());
+            }
+
+            // First time chest is picked up - activate escape sequence!
+            if (this.chest.isBeingCarried() && !this.chestActivated) {
+                this.chestActivated = true;
+                this.activateChestEscape(platforms);
+            }
+
+            this.chest.updatePhysics(dt, platforms);
+
+            // Check if chest fell off the level - respawn to nearest platform edge
+            if (this.chest.position.y > this.deathY) {
+                this.respawnChestToNearestPlatform(platforms);
+            }
+
+            // Check if chest reached return base
+            if (this.returnBase) {
+                const dx = this.chest.centerX - this.returnBase.centerX;
+                const dy = this.chest.centerY - this.returnBase.centerY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 70) {
+                    this.hasWon = true;
+                    this.showVictory();
+                    if (this.mode === 'host') {
+                        this.hostSession?.sendVictory(-1); // -1 indicates team victory
+                    }
+                }
+            }
         }
 
         // Camera follows all players in multiplayer
@@ -553,15 +761,23 @@ export class Game {
         return this.deaths[0];
     }
 
+    private formatTime(seconds: number): string {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
     private showVictory(): void {
         const totalDeaths = this.deaths.reduce((a, b) => a + b, 0);
         const totalCoins = this.coins.length;
+        const timeStr = this.formatTime(this.levelTime);
         const overlay = document.createElement('div');
         overlay.className = 'victory-overlay';
         overlay.innerHTML = `
             <div class="victory-content">
                 <h1>Victory!</h1>
-                ${this.mode !== 'single' ? '<p>Both players reached the goal!</p>' : ''}
+                <p>Chest delivered to base!</p>
+                <p>Time: ${timeStr}</p>
                 <p>Coins: ${this.coinsCollected} / ${totalCoins}</p>
                 <p>Deaths: ${totalDeaths}</p>
                 <button id="playAgain">Play Again</button>
@@ -575,7 +791,23 @@ export class Game {
             for (const player of this.players) {
                 player.hasReachedVictory = false;
             }
+            // Reset chest position and escape state
+            this.chestActivated = false;
+            this.renderer.setBackgroundColor(0x6ab0de, 0x4a7a4a);
+            AudioManager.stopMusic(0.3);
+            AudioManager.playMusic('level_music', 0.5);
+            if (this.chest && this.victoryPoint) {
+                this.chest.position.x = this.victoryPoint.x - 24;
+                this.chest.position.y = this.victoryPoint.y - 48;
+                this.chest.velocity.set(0, 0);
+            }
+            // Remove any escape monsters (keep only the original one if any)
+            while (this.monsters.length > 1) {
+                const monster = this.monsters.pop()!;
+                monster.removeFromScene(this.renderer);
+            }
             this.respawnAllPlayers();
+            this.levelTime = 0;
         });
     }
 
@@ -587,6 +819,98 @@ export class Game {
             player.velocity.set(0, 0);
             player.grounded = false;
             player.hasReachedVictory = false;
+        }
+    }
+
+    private respawnChestToNearestPlatform(platforms: Platform[]): void {
+        if (!this.chest || platforms.length === 0) return;
+
+        const chestX = this.chest.centerX;
+
+        // Find the nearest platform edge
+        let nearestX = 0;
+        let nearestY = 0;
+        let nearestDist = Infinity;
+
+        for (const platform of platforms) {
+            // Check left edge
+            const leftEdgeX = platform.left + this.chest.width / 2;
+            const leftDist = Math.abs(chestX - leftEdgeX);
+            if (leftDist < nearestDist) {
+                nearestDist = leftDist;
+                nearestX = platform.left;
+                nearestY = platform.top - this.chest.height;
+            }
+
+            // Check right edge
+            const rightEdgeX = platform.right - this.chest.width / 2;
+            const rightDist = Math.abs(chestX - rightEdgeX);
+            if (rightDist < nearestDist) {
+                nearestDist = rightDist;
+                nearestX = platform.right - this.chest.width;
+                nearestY = platform.top - this.chest.height;
+            }
+
+            // Check center of platform
+            const centerX = platform.centerX;
+            const centerDist = Math.abs(chestX - centerX);
+            if (centerDist < nearestDist) {
+                nearestDist = centerDist;
+                nearestX = centerX - this.chest.width / 2;
+                nearestY = platform.top - this.chest.height;
+            }
+        }
+
+        // Respawn chest
+        this.chest.position.x = nearestX;
+        this.chest.position.y = nearestY;
+        this.chest.velocity.set(0, 0);
+    }
+
+    private activateChestEscape(platforms: Platform[]): void {
+        // Change background to fiery red and switch to escape music
+        this.renderer.setBackgroundColor(0x8b2500, 0x4a2020);
+        AudioManager.stopMusic(0.3);
+        AudioManager.playMusic('escape_music', 0.6);
+
+        // Show the return base
+        if (this.returnBase) {
+            this.returnBase.show();
+        }
+
+        // Find platform closest to spawn point to spawn a monster
+        if (!this.spawnPoint) return;
+
+        let nearestPlatform: Platform | null = null;
+        let nearestDist = Infinity;
+
+        for (const platform of platforms) {
+            // Skip spawn platform itself
+            if (platform.hasTag('spawn-platform')) continue;
+            // Need platform wide enough for monster
+            if (platform.width < 200) continue;
+
+            const dx = platform.centerX - this.spawnPoint.x;
+            const dy = platform.centerY - this.spawnPoint.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // Find closest platform that's not too close (give players some space)
+            if (dist > 100 && dist < nearestDist) {
+                nearestDist = dist;
+                nearestPlatform = platform;
+            }
+        }
+
+        // Spawn a monster on that platform
+        if (nearestPlatform) {
+            const monster = new Monster(nearestPlatform);
+            this.monsters.push(monster);
+            this.entities.push(monster);
+            monster.createMesh();
+            monster.addToScene(this.renderer);
+
+            // Play roar sound for dramatic effect
+            AudioManager.play('monster_roar', 0.7);
         }
     }
 

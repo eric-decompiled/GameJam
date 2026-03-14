@@ -4,6 +4,7 @@ import { Entity } from './Entity';
 import { Renderer } from '../graphics/Renderer';
 import { Player } from './Player';
 import { Platform } from './Platform';
+import { AudioManager } from '../core/AudioManager';
 
 const gltfLoader = new GLTFLoader();
 
@@ -135,6 +136,7 @@ export class Monster extends Entity {
 
     // Check if player is on the same platform and set as target
     checkForPlayers(players: Player[]): void {
+        const wasChasing = this.targetPlayer !== null;
         this.targetPlayer = null;
 
         for (const player of players) {
@@ -142,6 +144,11 @@ export class Monster extends Entity {
                 this.targetPlayer = player;
                 break; // Chase first player found
             }
+        }
+
+        // Play roar when starting to chase
+        if (!wasChasing && this.targetPlayer !== null) {
+            AudioManager.play('monster_roar', 0.5);
         }
     }
 

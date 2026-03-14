@@ -98,6 +98,16 @@ export class Renderer {
         // Handled by render
     }
 
+    setBackgroundColor(color: number, groundColor?: number): void {
+        this.renderer.setClearColor(new THREE.Color(color));
+        if (this.backgroundWall) {
+            (this.backgroundWall.material as THREE.MeshLambertMaterial).color.setHex(color);
+        }
+        if (groundColor !== undefined && this.backgroundGround) {
+            (this.backgroundGround.material as THREE.MeshLambertMaterial).color.setHex(groundColor);
+        }
+    }
+
     private updateCameraPosition(): void {
         if (this.gameCamera) {
             const zoom = this.gameCamera.getZoom();
