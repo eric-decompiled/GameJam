@@ -88,6 +88,8 @@ export class Game {
         await AudioManager.preload('menu_music', `${import.meta.env.BASE_URL}audio/menu_music.wav`);
         await AudioManager.preload('level_music', `${import.meta.env.BASE_URL}audio/level_music.mp3`);
         await AudioManager.preload('escape_music', `${import.meta.env.BASE_URL}audio/escape_music.mp3`);
+        await AudioManager.preload('victory', `${import.meta.env.BASE_URL}audio/victory.mp3`);
+        await AudioManager.preload('coin', `${import.meta.env.BASE_URL}audio/coin.mp3`);
         this.audioReady = true;
     }
 
@@ -402,9 +404,11 @@ export class Game {
         this.hasWon = false;
         this.levelTime = 0;
         this.updateCoinHud();
+        Monster.isMultiplayerMode = false;
 
         const spawn = this.levelManager.getSpawnPoint();
         this.spawnPoint = { x: spawn.x, y: spawn.y };
+        Monster.spawnPoint = this.spawnPoint;
         const player = new Player(spawn.x, spawn.y, this.selectedCharacterId, false);
         this.players.push(player);
         this.entities.push(player);
@@ -551,9 +555,11 @@ export class Game {
         this.updateCoinHud();
         this.deaths = [0, 0];
         this.hasWon = false;
+        Monster.isMultiplayerMode = true;
 
         const spawn = this.levelManager.getSpawnPoint();
         this.spawnPoint = { x: spawn.x, y: spawn.y };
+        Monster.spawnPoint = this.spawnPoint;
 
         // Create return base at spawn point
         this.returnBase = new ReturnBase(spawn.x, spawn.y);
@@ -673,14 +679,15 @@ export class Game {
             // Old per-player victory removed - now using chest mechanic
 
             // Check monster collisions
+            const isMultiplayer = this.players.length > 1;
             for (const monster of this.monsters) {
-                const collision = monster.checkPlayerCollision(player);
+                const collision = monster.checkPlayerCollision(player, isMultiplayer);
                 if (collision === 'kill') {
                     this.respawnPlayer(player);
                     break;
-                } else if (collision === 'stomp') {
+                } else if (collision === 'stomp' || collision === 'back_attack') {
                     monster.kill();
-                    player.velocity.y = -400; // Bounce up after stomp
+                    player.velocity.y = -400; // Bounce up after stomp/back attack
                 }
             }
 
@@ -688,6 +695,7 @@ export class Game {
             for (const coin of this.coins) {
                 if (coin.checkPlayerCollision(player)) {
                     coin.collect();
+                    AudioManager.play('coin', 0.4);
                     this.coinsCollected++;
                     this.updateCoinHud();
 
@@ -847,6 +855,10 @@ export class Game {
     }
 
     private showVictory(): void {
+        // Stop music and play victory fanfare
+        AudioManager.stopMusic(0.3);
+        AudioManager.play('victory', 0.7);
+
         const totalDeaths = this.deaths.reduce((a, b) => a + b, 0);
         const totalCoins = this.coins.length;
         const timeStr = this.formatTime(this.levelTime);
@@ -866,28 +878,54 @@ export class Game {
 
         document.getElementById('playAgain')?.addEventListener('click', () => {
             overlay.remove();
-            this.hasWon = false;
-            for (const player of this.players) {
-                player.hasReachedVictory = false;
-            }
-            // Reset chest position and escape state
-            this.chestActivated = false;
-            this.renderer.setBackgroundColor(0x6ab0de, 0x4a7a4a);
-            AudioManager.stopMusic(0.3);
-            AudioManager.playMusic('level_music', 0.5);
-            if (this.chest && this.victoryPoint) {
-                this.chest.position.x = this.victoryPoint.x - 24;
-                this.chest.position.y = this.victoryPoint.y - 48;
-                this.chest.velocity.set(0, 0);
-            }
-            // Remove any escape monsters (keep only the original one if any)
-            while (this.monsters.length > 1) {
-                const monster = this.monsters.pop()!;
-                monster.removeFromScene(this.renderer);
-            }
-            this.respawnAllPlayers();
-            this.levelTime = 0;
+            this.resetGameState();
         });
+    }
+
+    private resetGameState(): void {
+        // Reset win state
+        this.hasWon = false;
+        this.chestActivated = false;
+        for (const player of this.players) {
+            player.hasReachedVictory = false;
+        }
+
+        // Reset background and music
+        this.renderer.setBackgroundColor(0x6ab0de, 0x4a7a4a);
+        AudioManager.playMusic('level_music', 0.5);
+
+        // Reset chest
+        if (this.chest) {
+            this.chest.removeFromScene(this.renderer);
+            this.entities = this.entities.filter(e => e !== this.chest);
+            this.chest = null;
+        }
+
+        // Remove all monsters
+        for (const monster of this.monsters) {
+            monster.removeFromScene(this.renderer);
+        }
+        this.monsters = [];
+        this.entities = this.entities.filter(e => !e.hasTag('monster'));
+
+        // Reset coins
+        this.coinsCollected = 0;
+        for (const coin of this.coins) {
+            coin.reset();
+        }
+        this.updateCoinHud();
+
+        // Spawn chest if no coins, otherwise wait for collection
+        if (this.coins.length === 0 && this.victoryPoint) {
+            this.spawnChest();
+        }
+
+        // Reset deaths and time
+        this.deaths = this.players.map(() => 0);
+        this.levelTime = 0;
+
+        // Respawn all players
+        this.respawnAllPlayers();
     }
 
     private respawnAllPlayers(): void {

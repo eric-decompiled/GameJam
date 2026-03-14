@@ -104,6 +104,14 @@ export class Coin extends Entity {
         }
     }
 
+    reset(): void {
+        this.collected = false;
+        this.active = true;
+        if (this.mesh) {
+            this.mesh.visible = true;
+        }
+    }
+
     render(_renderer: Renderer): void {
         if (this.collected) return;
 
