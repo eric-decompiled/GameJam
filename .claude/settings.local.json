@@ -21,7 +21,8 @@
       "Bash(npm uninstall:*)",
       "Bash(open:*)",
       "Bash(ls:*)",
-      "Bash(sips:*)"
+      "Bash(sips:*)",
+      "Bash(npx gltf-transform:*)"
     ]
   }
 }

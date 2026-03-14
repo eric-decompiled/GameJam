@@ -11,8 +11,11 @@
     "lint:levels": "npx tsx src/tools/linter/index.ts"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "^4.3.0",
     "@types/three": "^0.183.1",
     "concurrently": "^9.2.1",
+    "gltfpack": "^1.0.0",
+    "sharp": "^0.34.5",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^8.0.0"

@@ -1,124 +1,130 @@
 {
-    "name": "Level 1 - Getting Started",
-    "worldWidth": 2200,
-    "worldHeight": 800,
-    "spawn": {
-        "x": 100,
-        "y": 600
+  "name": "test1",
+  "worldWidth": 2200,
+  "worldHeight": 800,
+  "spawn": {
+    "x": 100,
+    "y": 600
+  },
+  "victory": {
+    "x": 1775,
+    "y": 368
+  },
+  "platforms": [
+    {
+      "x": 0,
+      "y": 700,
+      "width": 600,
+      "height": 100,
+      "comment": "Starting ground"
     },
-    "victory": {
-        "x": 1775,
-        "y": 368
+    {
+      "x": 224,
+      "y": 576,
+      "width": 120,
+      "height": 32,
+      "comment": "First step up"
     },
-    "platforms": [
-        {
-            "x": 0,
-            "y": 700,
-            "width": 600,
-            "height": 100,
-            "comment": "Starting ground"
-        },
-        {
-            "x": 250,
-            "y": 550,
-            "width": 120,
-            "height": 32,
-            "comment": "First step up"
-        },
-        {
-            "x": 450,
-            "y": 450,
-            "width": 120,
-            "height": 32,
-            "comment": "Second step"
-        },
-        {
-            "x": 650,
-            "y": 350,
-            "width": 150,
-            "height": 32,
-            "comment": "Third step"
-        },
-        {
-            "x": 800,
-            "y": 700,
-            "width": 300,
-            "height": 100,
-            "comment": "Middle ground section"
-        },
-        {
-            "x": 1000,
-            "y": 550,
-            "width": 100,
-            "height": 32,
-            "comment": "Platform above middle"
-        },
-        {
-            "x": 1200,
-            "y": 450,
-            "width": 100,
-            "height": 32,
-            "comment": "Higher platform"
-        },
-        {
-            "x": 1400,
-            "y": 700,
-            "width": 400,
-            "height": 100,
-            "comment": "End ground section"
-        },
-        {
-            "x": 1550,
-            "y": 550,
-            "width": 150,
-            "height": 32,
-            "comment": "End platform"
-        },
-        {
-            "x": 1700,
-            "y": 400,
-            "width": 150,
-            "height": 32,
-            "comment": "Final high platform"
-        }
-    ],
-    "ladders": [
-        {
-            "x": 50,
-            "y": 300,
-            "height": 400
-        }
-    ],
-    "movingPlatforms": [
-        {
-            "width": 120,
-            "height": 24,
-            "speed": 80,
-            "path": [
-                { "x": 550, "y": 600 },
-                { "x": 750, "y": 600 }
-            ],
-            "comment": "Horizontal moving platform"
-        },
-        {
-            "width": 100,
-            "height": 24,
-            "speed": 60,
-            "path": [
-                { "x": 1100, "y": 650 },
-                { "x": 1100, "y": 450 }
-            ],
-            "comment": "Vertical elevator"
-        },
-        {
-            "width": 100,
-            "height": 24,
-            "speed": 60,
-            "path": [
-                { "x": 1880, "y": 650 },
-                { "x": 1880, "y": 300 }
-            ],
-            "comment": "Final elevator to victory"
-        }
-    ]
+    {
+      "x": 480,
+      "y": 480,
+      "width": 120,
+      "height": 32,
+      "comment": "Second step"
+    },
+    {
+      "x": 704,
+      "y": 416,
+      "width": 150,
+      "height": 32,
+      "comment": "Third step"
+    },
+    {
+      "x": 800,
+      "y": 700,
+      "width": 300,
+      "height": 100,
+      "comment": "Middle ground section"
+    },
+    {
+      "x": 1000,
+      "y": 550,
+      "width": 100,
+      "height": 32,
+      "comment": "Platform above middle"
+    },
+    {
+      "x": 1280,
+      "y": 448,
+      "width": 100,
+      "height": 32,
+      "comment": "Higher platform"
+    },
+    {
+      "x": 1400,
+      "y": 700,
+      "width": 400,
+      "height": 100,
+      "comment": "End ground section"
+    },
+    {
+      "x": 1550,
+      "y": 550,
+      "width": 150,
+      "height": 32,
+      "comment": "End platform"
+    },
+    {
+      "x": 1700,
+      "y": 400,
+      "width": 150,
+      "height": 32,
+      "comment": "Final high platform"
+    }
+  ],
+  "movingPlatforms": [
+    {
+      "width": 120,
+      "height": 24,
+      "speed": 80,
+      "path": [
+        { "x": 550, "y": 600 },
+        { "x": 750, "y": 600 }
+      ],
+      "comment": "Horizontal moving platform"
+    },
+    {
+      "width": 100,
+      "height": 32,
+      "speed": 60,
+      "path": [
+        { "x": 1164, "y": 650 },
+        { "x": 1164, "y": 450 }
+      ],
+      "comment": "Vertical elevator"
+    },
+    {
+      "width": 100,
+      "height": 24,
+      "speed": 60,
+      "path": [
+        { "x": 1880, "y": 650 },
+        { "x": 1880, "y": 300 }
+      ],
+      "comment": "Final elevator to victory"
+    }
+  ],
+  "monsters": [
+    {
+      "x": 448,
+      "y": 672
+    }
+  ],
+  "coins": [
+    { "x": 544, "y": 448 },
+    { "x": 1056, "y": 512 },
+    { "x": 1632, "y": 544 },
+    { "x": 1216, "y": 576 },
+    { "x": 960, "y": 672 }
+  ]
 }
