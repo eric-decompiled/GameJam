@@ -5,10 +5,18 @@ import { Renderer } from '../graphics/Renderer';
 import { InputManager } from '../core/InputManager';
 import { PLAYER } from '../utils/constants';
 import type { Platform } from './Platform';
+import type { InputState, PlayerState } from '../network/Protocol';
 
 const gltfLoader = new GLTFLoader();
 
+// Player colors for multiplayer
+const PLAYER_COLORS = [0x4a90d9, 0xd94a4a]; // Blue, Red
+
 export class Player extends Entity {
+    playerId: number = 0;
+    isRemote: boolean = false;
+    hasReachedVictory: boolean = false;
+
     moveDirection: number = 0;
     facingRight: boolean = true;
     grounded: boolean = false;
@@ -17,18 +25,32 @@ export class Player extends Entity {
     jumpBufferTimer: number = 0;
     wasGrounded: boolean = false;
 
+    // Climbing state
+    isClimbing: boolean = false;
+    onLadder: boolean = false;
+    ladderX: number = 0; // X position of current ladder
+    climbDirection: number = 0;
+    private climbStarting: boolean = false;
+    private climbStartDone: boolean = false;
+    private inClimbAnimation: boolean = false;
+    private readonly CLIMB_SPEED: number = 150;
+
     private mixer: THREE.AnimationMixer | null = null;
     private idleAction: THREE.AnimationAction | null = null;
     private walkAction: THREE.AnimationAction | null = null;
     private runAction: THREE.AnimationAction | null = null;
     private jumpAction: THREE.AnimationAction | null = null;
+    private climbStartAction: THREE.AnimationAction | null = null;
+    private climbAction: THREE.AnimationAction | null = null;
     private currentAction: THREE.AnimationAction | null = null;
     private playerModel: THREE.Object3D | null = null;
     private clock: THREE.Clock = new THREE.Clock();
     private modelScale: number = 1;
 
-    constructor(x: number, y: number) {
+    constructor(x: number, y: number, playerId: number = 0, isRemote: boolean = false) {
         super(x, y, PLAYER.WIDTH, PLAYER.HEIGHT);
+        this.playerId = playerId;
+        this.isRemote = isRemote;
         this.addTag('player');
         this.depth = 32;
     }
@@ -36,26 +58,53 @@ export class Player extends Entity {
     createMesh(): THREE.Object3D {
         this.mesh = new THREE.Group();
 
+        const playerColor = PLAYER_COLORS[this.playerId % PLAYER_COLORS.length];
+
         // Placeholder while model loads
         const bodyGeom = new THREE.BoxGeometry(this.width, this.height, this.depth);
-        const bodyMat = new THREE.MeshLambertMaterial({ color: 0x4a90d9, transparent: true, opacity: 0.3 });
+        const bodyMat = new THREE.MeshLambertMaterial({ color: playerColor, transparent: true, opacity: 0.3 });
         const body = new THREE.Mesh(bodyGeom, bodyMat);
         body.castShadow = true;
         body.receiveShadow = true;
         body.name = 'placeholder';
         this.mesh.add(body);
 
-        // Load animations
+        // Load animations for this player
         this.loadAnimations();
 
         this.updateMeshPosition();
         return this.mesh;
     }
 
+    private getModelPaths(): { idle: string; walk: string; run: string; jump: string; climbStart?: string; climbCont?: string } {
+        const base = import.meta.env.BASE_URL;
+        if (this.playerId === 1) {
+            // Player 2 models
+            return {
+                idle: `${base}models/p2_idle.glb`,
+                walk: `${base}models/p2_walk.glb`,
+                run: `${base}models/p2_run.glb`,
+                jump: `${base}models/p2_jump.glb`
+                // No climb animations for P2 yet
+            };
+        }
+        // Player 1 models
+        return {
+            idle: `${base}models/idle.glb`,
+            walk: `${base}models/Walk.glb`,
+            run: `${base}models/run.glb`,
+            jump: `${base}models/jump.glb`,
+            climbStart: `${base}models/Climb_start.glb`,
+            climbCont: `${base}models/Climb_Cont.glb`
+        };
+    }
+
     private async loadAnimations(): Promise<void> {
+        const paths = this.getModelPaths();
+
         try {
             // Load idle model first to set up the character
-            const idleGltf = await gltfLoader.loadAsync(`${import.meta.env.BASE_URL}models/idle.glb`);
+            const idleGltf = await gltfLoader.loadAsync(paths.idle);
             if (!this.mesh) return;
 
             // Remove placeholder
@@ -104,24 +153,49 @@ export class Player extends Entity {
             }
 
             // Load walk animation
-            const walkGltf = await gltfLoader.loadAsync(`${import.meta.env.BASE_URL}models/Walk.glb`);
+            const walkGltf = await gltfLoader.loadAsync(paths.walk);
             if (walkGltf.animations.length > 0) {
                 this.walkAction = this.mixer.clipAction(walkGltf.animations[0]);
-                this.walkAction.timeScale = -1;  // Play in reverse
+                if (this.playerId === 0) {
+                    this.walkAction.timeScale = -1;  // Play in reverse for P1
+                }
             }
 
             // Load run animation
-            const runGltf = await gltfLoader.loadAsync(`${import.meta.env.BASE_URL}models/run.glb`);
+            const runGltf = await gltfLoader.loadAsync(paths.run);
             if (runGltf.animations.length > 0) {
                 this.runAction = this.mixer.clipAction(runGltf.animations[0]);
             }
 
             // Load jump animation
-            const jumpGltf = await gltfLoader.loadAsync(`${import.meta.env.BASE_URL}models/jump.glb`);
+            const jumpGltf = await gltfLoader.loadAsync(paths.jump);
             if (jumpGltf.animations.length > 0) {
                 this.jumpAction = this.mixer.clipAction(jumpGltf.animations[0]);
                 this.jumpAction.setLoop(THREE.LoopOnce, 1);
                 this.jumpAction.clampWhenFinished = true;
+            }
+
+            // Load climb animations (P1 only for now)
+            if (paths.climbStart && paths.climbCont) {
+                const climbStartGltf = await gltfLoader.loadAsync(paths.climbStart);
+                if (climbStartGltf.animations.length > 0) {
+                    this.climbStartAction = this.mixer.clipAction(climbStartGltf.animations[0]);
+                    this.climbStartAction.setLoop(THREE.LoopOnce, 1);
+                    this.climbStartAction.clampWhenFinished = true;
+                }
+
+                const climbContGltf = await gltfLoader.loadAsync(paths.climbCont);
+                if (climbContGltf.animations.length > 0) {
+                    this.climbAction = this.mixer.clipAction(climbContGltf.animations[0]);
+                }
+
+                // Listen for climb start animation to finish
+                this.mixer.addEventListener('finished', (e) => {
+                    if (e.action === this.climbStartAction) {
+                        this.climbStarting = false;
+                        this.climbStartDone = true;
+                    }
+                });
             }
 
             // Start with idle
@@ -130,7 +204,7 @@ export class Player extends Entity {
                 this.currentAction = this.idleAction;
             }
         } catch (error) {
-            console.error('Failed to load player animations:', error);
+            console.error(`Failed to load player ${this.playerId} animations:`, error);
         }
     }
 
@@ -158,7 +232,48 @@ export class Player extends Entity {
             this.moveDirection = 0;
         }
 
-        if (input.isJumpJustPressed()) {
+        // Climbing input
+        if (this.onLadder) {
+            const vertDir = input.getVerticalAxis();
+
+            // Start climbing when pressing up/down
+            if (vertDir !== 0 && !this.isClimbing) {
+                this.isClimbing = true;
+                // Snap to ladder center
+                this.position.x = this.ladderX;
+                this.velocity.x = 0;
+                // Only play climb start once per ladder
+                if (!this.climbStartDone) {
+                    this.climbStarting = true;
+                    if (this.climbStartAction) {
+                        this.climbStartAction.reset();
+                    }
+                }
+            }
+
+            // Update climb direction (can be 0 when not pressing)
+            this.climbDirection = vertDir;
+
+            // Jump off ladder
+            if (input.isJumpJustPressed() && this.isClimbing) {
+                this.isClimbing = false;
+                this.climbStarting = false;
+                this.climbStartDone = false;
+                this.inClimbAnimation = false;
+                this.velocity.y = -PLAYER.JUMP_FORCE * 0.7;
+                this.jumpBufferTimer = 0;
+                return;
+            }
+        } else {
+            // Left the ladder - reset climb state
+            this.isClimbing = false;
+            this.climbStarting = false;
+            this.climbStartDone = false;
+            this.inClimbAnimation = false;
+            this.climbDirection = 0;
+        }
+
+        if (!this.isClimbing && input.isJumpJustPressed()) {
             this.jumpBufferTimer = PLAYER.JUMP_BUFFER_TIME;
         }
 
@@ -168,6 +283,19 @@ export class Player extends Entity {
     }
 
     update(dt: number): void {
+        // Climbing movement
+        if (this.isClimbing) {
+            this.velocity.x = 0;
+
+            // Reduced movement during climb start animation
+            if (this.climbStarting) {
+                this.velocity.y = this.climbDirection * this.CLIMB_SPEED * 0.2;
+            } else {
+                this.velocity.y = this.climbDirection * this.CLIMB_SPEED;
+            }
+            return;
+        }
+
         if (this.moveDirection !== 0) {
             this.velocity.x += this.moveDirection * PLAYER.ACCELERATION * dt;
             if (Math.abs(this.velocity.x) > PLAYER.MAX_SPEED) {
@@ -210,7 +338,24 @@ export class Player extends Entity {
         }
 
         // Switch animation based on state
-        if (!this.grounded && this.jumpAction) {
+        if (this.isClimbing) {
+            // Play climb start once, then switch to climb
+            if (this.climbStarting && this.climbStartAction) {
+                if (!this.inClimbAnimation) {
+                    console.log('Starting climb animation');
+                    this.switchAnimation(this.climbStartAction);
+                    this.inClimbAnimation = true;
+                }
+            } else if (this.climbStartDone && this.climbAction) {
+                // Only switch to climb action once after climb start finishes
+                if (this.currentAction !== this.climbAction) {
+                    console.log('Switching to continuous climb');
+                    this.switchAnimation(this.climbAction);
+                }
+                // Pause/unpause based on direction
+                this.climbAction.paused = this.climbDirection === 0;
+            }
+        } else if (!this.grounded && this.jumpAction) {
             this.switchAnimation(this.jumpAction);
         } else {
             const speed = Math.abs(this.velocity.x);
@@ -227,9 +372,107 @@ export class Player extends Entity {
 
         // Rotate to face direction
         if (this.mesh) {
-            const targetRotation = this.facingRight ? Math.PI : 0;
+            let targetRotation: number;
+            if (this.isClimbing) {
+                // Face into the ladder (back to camera)
+                targetRotation = Math.PI / 2;
+            } else {
+                targetRotation = this.facingRight ? Math.PI : 0;
+            }
             this.mesh.rotation.y += (targetRotation - this.mesh.rotation.y) * 0.2;
         }
         this.updateMeshPosition();
+    }
+
+    // Handle input from network state (for remote players on host)
+    handleRemoteInput(input: InputState): void {
+        const moveDir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+        if (moveDir !== 0) {
+            this.facingRight = moveDir > 0;
+            this.moveDirection = moveDir;
+        } else {
+            this.moveDirection = 0;
+        }
+
+        // Climbing input
+        if (this.onLadder) {
+            const vertDir = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+
+            if (vertDir !== 0 && !this.isClimbing) {
+                this.isClimbing = true;
+                this.position.x = this.ladderX;
+                this.velocity.x = 0;
+                if (!this.climbStartDone) {
+                    this.climbStarting = true;
+                    if (this.climbStartAction) {
+                        this.climbStartAction.reset();
+                    }
+                }
+            }
+
+            this.climbDirection = vertDir;
+
+            if (input.jumpJustPressed && this.isClimbing) {
+                this.isClimbing = false;
+                this.climbStarting = false;
+                this.climbStartDone = false;
+                this.inClimbAnimation = false;
+                this.velocity.y = -PLAYER.JUMP_FORCE * 0.7;
+                this.jumpBufferTimer = 0;
+                return;
+            }
+        } else {
+            this.isClimbing = false;
+            this.climbStarting = false;
+            this.climbStartDone = false;
+            this.inClimbAnimation = false;
+            this.climbDirection = 0;
+        }
+
+        if (!this.isClimbing && input.jumpJustPressed) {
+            this.jumpBufferTimer = PLAYER.JUMP_BUFFER_TIME;
+        }
+
+        if (input.jumpJustReleased && this.velocity.y < 0) {
+            this.velocity.y *= PLAYER.JUMP_CUT_MULTIPLIER;
+        }
+    }
+
+    // Apply state received from network (for clients)
+    applyState(state: PlayerState): void {
+        this.position.x = state.x;
+        this.position.y = state.y;
+        this.velocity.x = state.vx;
+        this.velocity.y = state.vy;
+        this.grounded = state.grounded;
+        this.facingRight = state.facingRight;
+        this.isClimbing = state.isClimbing;
+        this.climbDirection = state.climbDirection;
+    }
+
+    // Get current state for network broadcast
+    getState(): PlayerState {
+        return {
+            id: this.playerId,
+            x: this.position.x,
+            y: this.position.y,
+            vx: this.velocity.x,
+            vy: this.velocity.y,
+            grounded: this.grounded,
+            facingRight: this.facingRight,
+            isClimbing: this.isClimbing,
+            climbDirection: this.climbDirection,
+            animState: this.getAnimState()
+        };
+    }
+
+    private getAnimState(): 'idle' | 'walk' | 'run' | 'jump' | 'climb' {
+        if (this.isClimbing) return 'climb';
+        if (!this.grounded) return 'jump';
+        const speed = Math.abs(this.velocity.x);
+        const runThreshold = PLAYER.MAX_SPEED * 0.7;
+        if (speed > runThreshold) return 'run';
+        if (speed > 10) return 'walk';
+        return 'idle';
     }
 }

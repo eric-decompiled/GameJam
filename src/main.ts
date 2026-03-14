@@ -27,10 +27,8 @@ window.addEventListener('DOMContentLoaded', () => {
             });
         }
     } else {
-        const initialLevel = levelSelect?.value || 'level1';
-        game.init(initialLevel).catch(error => {
-            console.error('Failed to initialize game:', error);
-        });
+        // Show multiplayer menu for normal game start
+        game.showMultiplayerMenu();
     }
 
     levelSelect?.addEventListener('change', () => {

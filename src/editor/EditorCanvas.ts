@@ -171,6 +171,22 @@ export class EditorCanvas {
             this.renderPlatform(ctx, p.x, p.y, p.width, p.height, selected);
         }
 
+        for (let i = 0; i < level.movingPlatforms.length; i++) {
+            const mp = level.movingPlatforms[i];
+            const selected = this.state.getSelection().type === 'movingPlatform' &&
+                           this.state.getSelection().index === i;
+            this.renderMovingPlatform(ctx, mp, selected);
+        }
+
+        if (level.ladders) {
+            for (let i = 0; i < level.ladders.length; i++) {
+                const ladder = level.ladders[i];
+                const selected = this.state.getSelection().type === 'ladder' &&
+                               this.state.getSelection().index === i;
+                this.renderLadder(ctx, ladder.x, ladder.y, ladder.height, selected);
+            }
+        }
+
         this.renderSpawn(ctx, level.spawn.x, level.spawn.y);
 
         if (level.victory) {
@@ -270,6 +286,93 @@ export class EditorCanvas {
         ctx.font = `${12 * this.zoom}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.fillText('SPAWN', screen.x, screen.y - size - 4 * this.zoom);
+    }
+
+    private renderLadder(
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        height: number,
+        selected: boolean
+    ): void {
+        const ladderWidth = 32;
+        const screen = this.worldToScreen(x, y);
+        const screenW = ladderWidth * this.zoom;
+        const screenH = height * this.zoom;
+
+        // Draw ladder rails
+        ctx.fillStyle = selected ? '#a07040' : '#8b5a2b';
+        ctx.fillRect(screen.x, screen.y, screenW, screenH);
+
+        // Draw rungs
+        const rungSpacing = 32 * this.zoom;
+        ctx.strokeStyle = selected ? '#c09060' : '#a06030';
+        ctx.lineWidth = 3;
+        for (let ry = screen.y + rungSpacing; ry < screen.y + screenH; ry += rungSpacing) {
+            ctx.beginPath();
+            ctx.moveTo(screen.x + 2, ry);
+            ctx.lineTo(screen.x + screenW - 2, ry);
+            ctx.stroke();
+        }
+
+        // Selection outline
+        if (selected) {
+            ctx.strokeStyle = '#ffcc00';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(screen.x, screen.y, screenW, screenH);
+        }
+    }
+
+    private renderMovingPlatform(
+        ctx: CanvasRenderingContext2D,
+        mp: { width: number; height: number; path: { x: number; y: number }[]; speed?: number },
+        selected: boolean
+    ): void {
+        if (mp.path.length < 2) return;
+
+        const start = mp.path[0];
+        const end = mp.path[1];
+
+        // Draw path line
+        const startScreen = this.worldToScreen(start.x + mp.width / 2, start.y + mp.height / 2);
+        const endScreen = this.worldToScreen(end.x + mp.width / 2, end.y + mp.height / 2);
+
+        ctx.strokeStyle = selected ? '#ffaa00' : '#aa8800';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 4]);
+        ctx.beginPath();
+        ctx.moveTo(startScreen.x, startScreen.y);
+        ctx.lineTo(endScreen.x, endScreen.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Draw platform at start position
+        const screenStart = this.worldToScreen(start.x, start.y);
+        const screenW = mp.width * this.zoom;
+        const screenH = mp.height * this.zoom;
+
+        ctx.fillStyle = selected ? '#9a8b6e' : '#7a6b54';
+        ctx.fillRect(screenStart.x, screenStart.y, screenW, screenH);
+        ctx.strokeStyle = selected ? '#caba9e' : '#8a7b64';
+        ctx.lineWidth = selected ? 2 : 1;
+        ctx.strokeRect(screenStart.x, screenStart.y, screenW, screenH);
+
+        // Draw ghost at end position
+        const screenEnd = this.worldToScreen(end.x, end.y);
+        ctx.fillStyle = 'rgba(122, 107, 84, 0.3)';
+        ctx.fillRect(screenEnd.x, screenEnd.y, screenW, screenH);
+        ctx.strokeStyle = selected ? '#caba9e' : '#8a7b64';
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(screenEnd.x, screenEnd.y, screenW, screenH);
+        ctx.setLineDash([]);
+
+        // Draw drag handles at path points if selected
+        if (selected) {
+            const handleSize = 10;
+            ctx.fillStyle = '#ffaa00';
+            ctx.fillRect(startScreen.x - handleSize / 2, startScreen.y - handleSize / 2, handleSize, handleSize);
+            ctx.fillRect(endScreen.x - handleSize / 2, endScreen.y - handleSize / 2, handleSize, handleSize);
+        }
     }
 
     private renderVictory(ctx: CanvasRenderingContext2D, x: number, y: number): void {

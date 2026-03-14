@@ -11,10 +11,11 @@ A 3D platformer game built with TypeScript and Three.js.
 ## Architecture
 
 - `src/core/` - Game loop, input handling, debug overlay
-- `src/entities/` - Player, Platform, base Entity class
+- `src/entities/` - Player, Platform, Ladder, Victory, base Entity class
 - `src/graphics/` - Three.js renderer, camera
 - `src/physics/` - Collision detection and resolution
 - `src/levels/` - Level loading from JSON
+- `src/editor/` - Level editor (2D canvas-based)
 - `public/levels/` - Level data files
 
 ## Key Systems
@@ -30,7 +31,7 @@ A 3D platformer game built with TypeScript and Three.js.
 ### 3D Models & Animation
 - Models stored in `public/models/` (GLB format)
 - **Platform**: `Platform_mk1.glb` - scaled to match platform dimensions
-- **Player animations**: `idle.glb`, `Walk.glb`, `run.glb`, `jump.glb`
+- **Player animations**: `idle.glb`, `Walk.glb`, `run.glb`, `jump.glb`, `Climb_start.glb`, `Climb_Cont.glb`
   - Walk animation plays reversed (`timeScale = -1`)
   - Model rotated -90° Y to face +X by default
   - Model offset -30px Y to align feet with ground
@@ -40,12 +41,31 @@ A 3D platformer game built with TypeScript and Three.js.
   - Walk: speed > 10
   - Run: speed > 70% of MAX_SPEED (210)
   - Jump: when not grounded
+  - Climb: when on ladder and pressing up/down
+
+### Ladders & Climbing
+- Ladders defined in level JSON with x, y, height
+- Player snaps to ladder X position when climbing starts
+- Climb state machine: `climbStarting` → `climbStartDone` → continuous climb
+- `Climb_start.glb` plays once, then switches to looping `Climb_Cont.glb`
+- Climbing pauses animation when not pressing up/down
+- Jump off ladder with Space (reduced jump force)
+
+### Level Editor
+- Accessible at `/editor.html`
+- 2D canvas with pan (scroll wheel, middle mouse, alt+click)
+- Tools: Select (also draws platforms), Spawn, Victory, Moving Platform, Ladder
+- Grid snapping (32px)
+- Clipboard-based export/import (Copy/Paste JSON)
+- localStorage persistence, undo with Cmd/Ctrl+Z
+- Test button opens game with current level in new tab
 
 ## Commands
 
 ```bash
-npm run dev      # Start dev server
+npm run dev      # Start dev server (game at /, editor at /editor.html)
 npm run build    # Production build
+npm run lint:levels  # Run level linter
 ```
 
 ## Deployment

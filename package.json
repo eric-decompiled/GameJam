@@ -3,18 +3,22 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -k \"node server.js\" \"vite --host\"",
+    "dev:solo": "vite --host",
+    "server": "node server.js",
     "build": "vite build",
     "preview": "vite preview",
     "lint:levels": "npx tsx src/tools/linter/index.ts"
   },
   "devDependencies": {
     "@types/three": "^0.183.1",
+    "concurrently": "^9.2.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^8.0.0"
   },
   "dependencies": {
-    "three": "^0.183.2"
+    "three": "^0.183.2",
+    "ws": "^8.19.0"
   }
 }

@@ -17,6 +17,12 @@ export interface MovingPlatformData {
     speed?: number;
 }
 
+export interface LadderData {
+    x: number;
+    y: number;
+    height: number;
+}
+
 export interface LevelData {
     name: string;
     worldWidth: number;
@@ -25,4 +31,5 @@ export interface LevelData {
     victory?: { x: number; y: number };
     platforms: PlatformData[];
     movingPlatforms: MovingPlatformData[];
+    ladders?: LadderData[];
 }

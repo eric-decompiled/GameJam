@@ -1,3 +1,5 @@
+import type { InputState } from '../network/Protocol';
+
 type KeyState = Record<string, boolean>;
 
 export class InputManager {
@@ -55,6 +57,21 @@ export class InputManager {
         return axis;
     }
 
+    getVerticalAxis(): number {
+        let axis = 0;
+        if (this.isDown('ArrowUp') || this.isDown('KeyW')) axis -= 1;
+        if (this.isDown('ArrowDown') || this.isDown('KeyS')) axis += 1;
+        return axis;
+    }
+
+    isClimbUpPressed(): boolean {
+        return this.isDown('ArrowUp') || this.isDown('KeyW');
+    }
+
+    isClimbDownPressed(): boolean {
+        return this.isDown('ArrowDown') || this.isDown('KeyS');
+    }
+
     isJumpPressed(): boolean {
         return this.isDown('Space') || this.isDown('ArrowUp') || this.isDown('KeyW');
     }
@@ -65,5 +82,18 @@ export class InputManager {
 
     isJumpJustReleased(): boolean {
         return this.isJustReleased('Space') || this.isJustReleased('ArrowUp') || this.isJustReleased('KeyW');
+    }
+
+    // Get current input state for network transmission
+    getInputState(): InputState {
+        return {
+            left: this.isDown('ArrowLeft') || this.isDown('KeyA'),
+            right: this.isDown('ArrowRight') || this.isDown('KeyD'),
+            up: this.isDown('ArrowUp') || this.isDown('KeyW'),
+            down: this.isDown('ArrowDown') || this.isDown('KeyS'),
+            jump: this.isJumpPressed(),
+            jumpJustPressed: this.isJumpJustPressed(),
+            jumpJustReleased: this.isJumpJustReleased()
+        };
     }
 }

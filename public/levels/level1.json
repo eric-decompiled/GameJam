@@ -82,6 +82,13 @@
             "comment": "Final high platform"
         }
     ],
+    "ladders": [
+        {
+            "x": 50,
+            "y": 300,
+            "height": 400
+        }
+    ],
     "movingPlatforms": [
         {
             "width": 120,
@@ -108,8 +115,8 @@
             "height": 24,
             "speed": 60,
             "path": [
-                { "x": 2050, "y": 650 },
-                { "x": 2050, "y": 300 }
+                { "x": 1880, "y": 650 },
+                { "x": 1880, "y": 300 }
             ],
             "comment": "Final elevator to victory"
         }

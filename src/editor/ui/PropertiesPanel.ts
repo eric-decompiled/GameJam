@@ -24,6 +24,22 @@ export class PropertiesPanel {
             }
         }
 
+        if (selection.type === 'movingPlatform' && selection.index !== null) {
+            const mp = this.state.getSelectedMovingPlatform();
+            if (mp) {
+                this.renderMovingPlatformProperties(mp, selection.index);
+                return;
+            }
+        }
+
+        if (selection.type === 'ladder' && selection.index !== null) {
+            const ladder = this.state.getSelectedLadder();
+            if (ladder) {
+                this.renderLadderProperties(ladder, selection.index);
+                return;
+            }
+        }
+
         if (selection.type === 'spawn') {
             const spawn = this.state.getLevel().spawn;
             this.renderSpawnProperties(spawn);
@@ -121,6 +137,131 @@ export class PropertiesPanel {
 
         xInput.addEventListener('change', updateSpawn);
         yInput.addEventListener('change', updateSpawn);
+    }
+
+    private renderLadderProperties(
+        ladder: { x: number; y: number; height: number },
+        index: number
+    ): void {
+        this.container.innerHTML = `
+            <h3>Ladder</h3>
+            <div class="panel-row-half">
+                <div>
+                    <label for="ladder-x">X</label>
+                    <input type="number" id="ladder-x" value="${ladder.x}" step="32">
+                </div>
+                <div>
+                    <label for="ladder-y">Y</label>
+                    <input type="number" id="ladder-y" value="${ladder.y}" step="32">
+                </div>
+            </div>
+            <div class="panel-row">
+                <label for="ladder-h">Height</label>
+                <input type="number" id="ladder-h" value="${ladder.height}" step="32" min="32">
+            </div>
+            <button class="danger" id="delete-ladder">Delete</button>
+        `;
+
+        const xInput = this.container.querySelector('#ladder-x') as HTMLInputElement;
+        const yInput = this.container.querySelector('#ladder-y') as HTMLInputElement;
+        const hInput = this.container.querySelector('#ladder-h') as HTMLInputElement;
+
+        const update = () => {
+            this.state.updateLadder(index, {
+                x: parseInt(xInput.value) || 0,
+                y: parseInt(yInput.value) || 0,
+                height: Math.max(32, parseInt(hInput.value) || 32)
+            });
+        };
+
+        xInput.addEventListener('change', update);
+        yInput.addEventListener('change', update);
+        hInput.addEventListener('change', update);
+
+        this.container.querySelector('#delete-ladder')!.addEventListener('click', () => {
+            this.state.deleteLadder(index);
+        });
+    }
+
+    private renderMovingPlatformProperties(
+        mp: { width: number; height: number; path: { x: number; y: number }[]; speed?: number },
+        index: number
+    ): void {
+        const start = mp.path[0] || { x: 0, y: 0 };
+        const end = mp.path[1] || { x: 0, y: 0 };
+
+        this.container.innerHTML = `
+            <h3>Moving Platform</h3>
+            <div class="panel-row-half">
+                <div>
+                    <label for="mp-w">W</label>
+                    <input type="number" id="mp-w" value="${mp.width}" step="32" min="32">
+                </div>
+                <div>
+                    <label for="mp-h">H</label>
+                    <input type="number" id="mp-h" value="${mp.height}" step="32" min="32">
+                </div>
+            </div>
+            <p class="info-text">Start Position</p>
+            <div class="panel-row-half">
+                <div>
+                    <label for="mp-sx">X</label>
+                    <input type="number" id="mp-sx" value="${start.x}" step="32">
+                </div>
+                <div>
+                    <label for="mp-sy">Y</label>
+                    <input type="number" id="mp-sy" value="${start.y}" step="32">
+                </div>
+            </div>
+            <p class="info-text">End Position</p>
+            <div class="panel-row-half">
+                <div>
+                    <label for="mp-ex">X</label>
+                    <input type="number" id="mp-ex" value="${end.x}" step="32">
+                </div>
+                <div>
+                    <label for="mp-ey">Y</label>
+                    <input type="number" id="mp-ey" value="${end.y}" step="32">
+                </div>
+            </div>
+            <div class="panel-row">
+                <label for="mp-speed">Speed</label>
+                <input type="number" id="mp-speed" value="${mp.speed || 60}" step="10" min="10">
+            </div>
+            <button class="danger" id="delete-mp">Delete</button>
+        `;
+
+        const wInput = this.container.querySelector('#mp-w') as HTMLInputElement;
+        const hInput = this.container.querySelector('#mp-h') as HTMLInputElement;
+        const sxInput = this.container.querySelector('#mp-sx') as HTMLInputElement;
+        const syInput = this.container.querySelector('#mp-sy') as HTMLInputElement;
+        const exInput = this.container.querySelector('#mp-ex') as HTMLInputElement;
+        const eyInput = this.container.querySelector('#mp-ey') as HTMLInputElement;
+        const speedInput = this.container.querySelector('#mp-speed') as HTMLInputElement;
+
+        const update = () => {
+            this.state.updateMovingPlatform(index, {
+                width: Math.max(32, parseInt(wInput.value) || 32),
+                height: Math.max(32, parseInt(hInput.value) || 32),
+                speed: Math.max(10, parseInt(speedInput.value) || 60),
+                path: [
+                    { x: parseInt(sxInput.value) || 0, y: parseInt(syInput.value) || 0 },
+                    { x: parseInt(exInput.value) || 0, y: parseInt(eyInput.value) || 0 }
+                ]
+            });
+        };
+
+        wInput.addEventListener('change', update);
+        hInput.addEventListener('change', update);
+        sxInput.addEventListener('change', update);
+        syInput.addEventListener('change', update);
+        exInput.addEventListener('change', update);
+        eyInput.addEventListener('change', update);
+        speedInput.addEventListener('change', update);
+
+        this.container.querySelector('#delete-mp')!.addEventListener('click', () => {
+            this.state.deleteMovingPlatform(index);
+        });
     }
 
     private renderVictoryProperties(victory: { x: number; y: number }): void {

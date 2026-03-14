@@ -49,6 +49,18 @@ export class SelectTool implements Tool {
             }
         }
 
+        const ladderIndex = this.state.getLadderAt(worldX, worldY);
+        if (ladderIndex !== null) {
+            this.state.selectLadder(ladderIndex);
+            return;
+        }
+
+        const movingPlatformIndex = this.state.getMovingPlatformAt(worldX, worldY);
+        if (movingPlatformIndex !== null) {
+            this.state.selectMovingPlatform(movingPlatformIndex);
+            return;
+        }
+
         const platformIndex = this.state.getPlatformAt(worldX, worldY);
         if (platformIndex !== null) {
             this.state.selectPlatform(platformIndex);

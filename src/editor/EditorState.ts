@@ -1,8 +1,8 @@
-import { LevelData, PlatformData } from '../shared/types';
+import { LevelData, PlatformData, MovingPlatformData, LadderData } from '../shared/types';
 
 const STORAGE_KEY = 'editorLevel';
 
-export type SelectionType = 'platform' | 'spawn' | 'victory' | null;
+export type SelectionType = 'platform' | 'movingPlatform' | 'ladder' | 'spawn' | 'victory' | null;
 
 export interface Selection {
     type: SelectionType;
@@ -85,7 +85,8 @@ export class EditorState {
             platforms: [
                 { x: 0, y: 700, width: 400, height: 100 }
             ],
-            movingPlatforms: []
+            movingPlatforms: [],
+            ladders: []
         };
     }
 
@@ -110,8 +111,32 @@ export class EditorState {
         return null;
     }
 
+    getSelectedMovingPlatform(): MovingPlatformData | null {
+        if (this.selection.type === 'movingPlatform' && this.selection.index !== null) {
+            return this.level.movingPlatforms[this.selection.index] || null;
+        }
+        return null;
+    }
+
+    getSelectedLadder(): LadderData | null {
+        if (this.selection.type === 'ladder' && this.selection.index !== null) {
+            return this.level.ladders?.[this.selection.index] || null;
+        }
+        return null;
+    }
+
     selectPlatform(index: number): void {
         this.selection = { type: 'platform', index };
+        this.emit('selectionChange');
+    }
+
+    selectMovingPlatform(index: number): void {
+        this.selection = { type: 'movingPlatform', index };
+        this.emit('selectionChange');
+    }
+
+    selectLadder(index: number): void {
+        this.selection = { type: 'ladder', index };
         this.emit('selectionChange');
     }
 
@@ -148,6 +173,65 @@ export class EditorState {
         if (index >= 0 && index < this.level.platforms.length) {
             this.level.platforms.splice(index, 1);
             if (this.selection.type === 'platform') {
+                if (this.selection.index === index) {
+                    this.clearSelection();
+                } else if (this.selection.index !== null && this.selection.index > index) {
+                    this.selection.index--;
+                }
+            }
+            this.emit('change');
+        }
+    }
+
+    addMovingPlatform(platform: MovingPlatformData): number {
+        this.level.movingPlatforms.push(platform);
+        const index = this.level.movingPlatforms.length - 1;
+        this.emit('change');
+        return index;
+    }
+
+    updateMovingPlatform(index: number, updates: Partial<MovingPlatformData>): void {
+        if (index >= 0 && index < this.level.movingPlatforms.length) {
+            Object.assign(this.level.movingPlatforms[index], updates);
+            this.emit('change');
+        }
+    }
+
+    deleteMovingPlatform(index: number): void {
+        if (index >= 0 && index < this.level.movingPlatforms.length) {
+            this.level.movingPlatforms.splice(index, 1);
+            if (this.selection.type === 'movingPlatform') {
+                if (this.selection.index === index) {
+                    this.clearSelection();
+                } else if (this.selection.index !== null && this.selection.index > index) {
+                    this.selection.index--;
+                }
+            }
+            this.emit('change');
+        }
+    }
+
+    addLadder(ladder: LadderData): number {
+        if (!this.level.ladders) {
+            this.level.ladders = [];
+        }
+        this.level.ladders.push(ladder);
+        const index = this.level.ladders.length - 1;
+        this.emit('change');
+        return index;
+    }
+
+    updateLadder(index: number, updates: Partial<LadderData>): void {
+        if (this.level.ladders && index >= 0 && index < this.level.ladders.length) {
+            Object.assign(this.level.ladders[index], updates);
+            this.emit('change');
+        }
+    }
+
+    deleteLadder(index: number): void {
+        if (this.level.ladders && index >= 0 && index < this.level.ladders.length) {
+            this.level.ladders.splice(index, 1);
+            if (this.selection.type === 'ladder') {
                 if (this.selection.index === index) {
                     this.clearSelection();
                 } else if (this.selection.index !== null && this.selection.index > index) {
@@ -227,6 +311,42 @@ export class EditorState {
             const p = this.level.platforms[i];
             if (worldX >= p.x && worldX <= p.x + p.width &&
                 worldY >= p.y && worldY <= p.y + p.height) {
+                return i;
+            }
+        }
+        return null;
+    }
+
+    getMovingPlatformAt(worldX: number, worldY: number): number | null {
+        for (let i = this.level.movingPlatforms.length - 1; i >= 0; i--) {
+            const mp = this.level.movingPlatforms[i];
+            // Check at start position
+            const startX = mp.path[0].x;
+            const startY = mp.path[0].y;
+            if (worldX >= startX && worldX <= startX + mp.width &&
+                worldY >= startY && worldY <= startY + mp.height) {
+                return i;
+            }
+            // Check at end position
+            if (mp.path.length > 1) {
+                const endX = mp.path[1].x;
+                const endY = mp.path[1].y;
+                if (worldX >= endX && worldX <= endX + mp.width &&
+                    worldY >= endY && worldY <= endY + mp.height) {
+                    return i;
+                }
+            }
+        }
+        return null;
+    }
+
+    getLadderAt(worldX: number, worldY: number): number | null {
+        if (!this.level.ladders) return null;
+        const ladderWidth = 32; // Visual width of ladder
+        for (let i = this.level.ladders.length - 1; i >= 0; i--) {
+            const ladder = this.level.ladders[i];
+            if (worldX >= ladder.x && worldX <= ladder.x + ladderWidth &&
+                worldY >= ladder.y && worldY <= ladder.y + ladder.height) {
                 return i;
             }
         }

@@ -100,12 +100,20 @@ export class Renderer {
 
     private updateCameraPosition(): void {
         if (this.gameCamera) {
-            const centerX = this.gameCamera.position.x + GAME.WIDTH / 2;
-            const centerY = this.gameCamera.position.y + GAME.HEIGHT / 2;
+            const zoom = this.gameCamera.getZoom();
+            const viewportWidth = this.gameCamera.viewportWidth;
+            const viewportHeight = this.gameCamera.viewportHeight;
+
+            const centerX = this.gameCamera.position.x + viewportWidth / 2;
+            const centerY = this.gameCamera.position.y + viewportHeight / 2;
+
+            // Adjust camera Z position based on zoom (farther = zoomed out)
+            const baseZ = 800;
+            const zOffset = baseZ / zoom;
 
             this.camera.position.x = centerX;
             this.camera.position.y = -centerY + 200;
-            this.camera.position.z = 800;
+            this.camera.position.z = zOffset;
             this.camera.lookAt(centerX, -centerY, 0);
 
             if (this.shadowLight) {
