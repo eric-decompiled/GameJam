@@ -30,7 +30,7 @@ export class LevelManager {
 
     async loadLevel(levelName: string): Promise<void> {
         try {
-            const response = await fetch(`src/levels/data/${levelName}.json`);
+            const response = await fetch(`${import.meta.env.BASE_URL}levels/${levelName}.json`);
             if (!response.ok) {
                 throw new Error(`Failed to load level: ${levelName}`);
             }
