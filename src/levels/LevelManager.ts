@@ -1,6 +1,5 @@
 import { Platform, MovingPlatform, PathPoint } from '../entities/Platform';
 import { Entity } from '../entities/Entity';
-import { Ladder } from '../entities/Ladder';
 
 interface PlatformData {
     x: number;
@@ -16,10 +15,14 @@ interface MovingPlatformData {
     speed?: number;
 }
 
-interface LadderData {
+interface MonsterData {
     x: number;
     y: number;
-    height: number;
+}
+
+interface CoinData {
+    x: number;
+    y: number;
 }
 
 interface LevelData {
@@ -30,7 +33,8 @@ interface LevelData {
     victory?: { x: number; y: number };
     platforms: PlatformData[];
     movingPlatforms: MovingPlatformData[];
-    ladders?: LadderData[];
+    monsters?: MonsterData[];
+    coins?: CoinData[];
 }
 
 export class LevelManager {
@@ -103,13 +107,6 @@ export class LevelManager {
                 this.entities.push(platform);
             }
         }
-
-        if (this.currentLevel.ladders) {
-            for (const l of this.currentLevel.ladders) {
-                const ladder = new Ladder(l.x, l.y, l.height);
-                this.entities.push(ladder);
-            }
-        }
     }
 
     getEntities(): Entity[] {
@@ -138,5 +135,13 @@ export class LevelManager {
             };
         }
         return { width: 800, height: 600 };
+    }
+
+    getMonsters(): MonsterData[] {
+        return this.currentLevel?.monsters || [];
+    }
+
+    getCoins(): CoinData[] {
+        return this.currentLevel?.coins || [];
     }
 }

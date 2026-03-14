@@ -17,10 +17,14 @@ export interface MovingPlatformData {
     speed?: number;
 }
 
-export interface LadderData {
+export interface MonsterData {
     x: number;
     y: number;
-    height: number;
+}
+
+export interface CoinData {
+    x: number;
+    y: number;
 }
 
 export interface LevelData {
@@ -31,5 +35,6 @@ export interface LevelData {
     victory?: { x: number; y: number };
     platforms: PlatformData[];
     movingPlatforms: MovingPlatformData[];
-    ladders?: LadderData[];
+    monsters?: MonsterData[];
+    coins?: CoinData[];
 }

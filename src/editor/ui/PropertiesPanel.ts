@@ -32,14 +32,6 @@ export class PropertiesPanel {
             }
         }
 
-        if (selection.type === 'ladder' && selection.index !== null) {
-            const ladder = this.state.getSelectedLadder();
-            if (ladder) {
-                this.renderLadderProperties(ladder, selection.index);
-                return;
-            }
-        }
-
         if (selection.type === 'spawn') {
             const spawn = this.state.getLevel().spawn;
             this.renderSpawnProperties(spawn);
@@ -50,6 +42,22 @@ export class PropertiesPanel {
             const victory = this.state.getLevel().victory;
             if (victory) {
                 this.renderVictoryProperties(victory);
+                return;
+            }
+        }
+
+        if (selection.type === 'monster' && selection.index !== null) {
+            const monster = this.state.getSelectedMonster();
+            if (monster) {
+                this.renderMonsterProperties(monster, selection.index);
+                return;
+            }
+        }
+
+        if (selection.type === 'coin' && selection.index !== null) {
+            const coin = this.state.getSelectedCoin();
+            if (coin) {
+                this.renderCoinProperties(coin, selection.index);
                 return;
             }
         }
@@ -139,50 +147,6 @@ export class PropertiesPanel {
         yInput.addEventListener('change', updateSpawn);
     }
 
-    private renderLadderProperties(
-        ladder: { x: number; y: number; height: number },
-        index: number
-    ): void {
-        this.container.innerHTML = `
-            <h3>Ladder</h3>
-            <div class="panel-row-half">
-                <div>
-                    <label for="ladder-x">X</label>
-                    <input type="number" id="ladder-x" value="${ladder.x}" step="32">
-                </div>
-                <div>
-                    <label for="ladder-y">Y</label>
-                    <input type="number" id="ladder-y" value="${ladder.y}" step="32">
-                </div>
-            </div>
-            <div class="panel-row">
-                <label for="ladder-h">Height</label>
-                <input type="number" id="ladder-h" value="${ladder.height}" step="32" min="32">
-            </div>
-            <button class="danger" id="delete-ladder">Delete</button>
-        `;
-
-        const xInput = this.container.querySelector('#ladder-x') as HTMLInputElement;
-        const yInput = this.container.querySelector('#ladder-y') as HTMLInputElement;
-        const hInput = this.container.querySelector('#ladder-h') as HTMLInputElement;
-
-        const update = () => {
-            this.state.updateLadder(index, {
-                x: parseInt(xInput.value) || 0,
-                y: parseInt(yInput.value) || 0,
-                height: Math.max(32, parseInt(hInput.value) || 32)
-            });
-        };
-
-        xInput.addEventListener('change', update);
-        yInput.addEventListener('change', update);
-        hInput.addEventListener('change', update);
-
-        this.container.querySelector('#delete-ladder')!.addEventListener('click', () => {
-            this.state.deleteLadder(index);
-        });
-    }
-
     private renderMovingPlatformProperties(
         mp: { width: number; height: number; path: { x: number; y: number }[]; speed?: number },
         index: number
@@ -266,7 +230,7 @@ export class PropertiesPanel {
 
     private renderVictoryProperties(victory: { x: number; y: number }): void {
         this.container.innerHTML = `
-            <h3>Victory Point</h3>
+            <h3>Chest Spawn</h3>
             <div class="panel-row-half">
                 <div>
                     <label for="victory-x">X</label>
@@ -291,5 +255,73 @@ export class PropertiesPanel {
 
         xInput.addEventListener('change', updateVictory);
         yInput.addEventListener('change', updateVictory);
+    }
+
+    private renderMonsterProperties(monster: { x: number; y: number }, index: number): void {
+        this.container.innerHTML = `
+            <h3>Monster</h3>
+            <div class="panel-row-half">
+                <div>
+                    <label for="monster-x">X</label>
+                    <input type="number" id="monster-x" value="${monster.x}" step="32">
+                </div>
+                <div>
+                    <label for="monster-y">Y</label>
+                    <input type="number" id="monster-y" value="${monster.y}" step="32">
+                </div>
+            </div>
+            <button class="danger" id="delete-monster">Delete</button>
+        `;
+
+        const xInput = this.container.querySelector('#monster-x') as HTMLInputElement;
+        const yInput = this.container.querySelector('#monster-y') as HTMLInputElement;
+
+        const update = () => {
+            this.state.updateMonster(index, {
+                x: parseInt(xInput.value) || 0,
+                y: parseInt(yInput.value) || 0
+            });
+        };
+
+        xInput.addEventListener('change', update);
+        yInput.addEventListener('change', update);
+
+        this.container.querySelector('#delete-monster')!.addEventListener('click', () => {
+            this.state.deleteMonster(index);
+        });
+    }
+
+    private renderCoinProperties(coin: { x: number; y: number }, index: number): void {
+        this.container.innerHTML = `
+            <h3>Coin</h3>
+            <div class="panel-row-half">
+                <div>
+                    <label for="coin-x">X</label>
+                    <input type="number" id="coin-x" value="${coin.x}" step="32">
+                </div>
+                <div>
+                    <label for="coin-y">Y</label>
+                    <input type="number" id="coin-y" value="${coin.y}" step="32">
+                </div>
+            </div>
+            <button class="danger" id="delete-coin">Delete</button>
+        `;
+
+        const xInput = this.container.querySelector('#coin-x') as HTMLInputElement;
+        const yInput = this.container.querySelector('#coin-y') as HTMLInputElement;
+
+        const update = () => {
+            this.state.updateCoin(index, {
+                x: parseInt(xInput.value) || 0,
+                y: parseInt(yInput.value) || 0
+            });
+        };
+
+        xInput.addEventListener('change', update);
+        yInput.addEventListener('change', update);
+
+        this.container.querySelector('#delete-coin')!.addEventListener('click', () => {
+            this.state.deleteCoin(index);
+        });
     }
 }

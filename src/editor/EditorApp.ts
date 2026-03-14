@@ -7,7 +7,8 @@ import { PlatformTool } from './tools/PlatformTool';
 import { SpawnTool } from './tools/SpawnTool';
 import { VictoryTool } from './tools/VictoryTool';
 import { MovingPlatformTool } from './tools/MovingPlatformTool';
-import { LadderTool } from './tools/LadderTool';
+import { MonsterTool } from './tools/MonsterTool';
+import { CoinTool } from './tools/CoinTool';
 import { Toolbar } from './ui/Toolbar';
 import { PropertiesPanel } from './ui/PropertiesPanel';
 import { LevelPanel } from './ui/LevelPanel';
@@ -44,9 +45,10 @@ export class EditorApp {
         this.tools.set('select', new SelectTool(this.state, this.grid, this.canvas));
         this.tools.set('platform', new PlatformTool(this.state, this.grid));
         this.tools.set('moving', new MovingPlatformTool(this.state, this.grid));
-        this.tools.set('ladder', new LadderTool(this.state, this.grid));
         this.tools.set('spawn', new SpawnTool(this.state, this.grid));
         this.tools.set('victory', new VictoryTool(this.state, this.grid));
+        this.tools.set('monster', new MonsterTool(this.state, this.grid));
+        this.tools.set('coin', new CoinTool(this.state, this.grid));
     }
 
     private initUI(): void {
@@ -94,19 +96,25 @@ export class EditorApp {
                 case '2':
                     this.setTool('moving');
                     break;
-                case 'l':
-                case '3':
-                    this.setTool('ladder');
-                    break;
                 case 's':
-                case '4':
+                case '3':
                     if (!e.ctrlKey && !e.metaKey) {
                         this.setTool('spawn');
                     }
                     break;
                 case 'g':
-                case '5':
+                case '4':
                     this.setTool('victory');
+                    break;
+                case 'n':
+                case '5':
+                    this.setTool('monster');
+                    break;
+                case 'c':
+                case '6':
+                    if (!e.ctrlKey && !e.metaKey) {
+                        this.setTool('coin');
+                    }
                     break;
                 case 'j':
                     this.toggleJumpArc();
@@ -147,6 +155,15 @@ export class EditorApp {
         if (selection.type === 'platform' && selection.index !== null) {
             this.state.deletePlatform(selection.index);
             this.setStatus('Platform deleted');
+        } else if (selection.type === 'movingPlatform' && selection.index !== null) {
+            this.state.deleteMovingPlatform(selection.index);
+            this.setStatus('Moving platform deleted');
+        } else if (selection.type === 'monster' && selection.index !== null) {
+            this.state.deleteMonster(selection.index);
+            this.setStatus('Monster deleted');
+        } else if (selection.type === 'coin' && selection.index !== null) {
+            this.state.deleteCoin(selection.index);
+            this.setStatus('Coin deleted');
         }
     }
 

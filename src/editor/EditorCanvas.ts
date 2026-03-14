@@ -178,19 +178,28 @@ export class EditorCanvas {
             this.renderMovingPlatform(ctx, mp, selected);
         }
 
-        if (level.ladders) {
-            for (let i = 0; i < level.ladders.length; i++) {
-                const ladder = level.ladders[i];
-                const selected = this.state.getSelection().type === 'ladder' &&
-                               this.state.getSelection().index === i;
-                this.renderLadder(ctx, ladder.x, ladder.y, ladder.height, selected);
-            }
-        }
-
         this.renderSpawn(ctx, level.spawn.x, level.spawn.y);
 
         if (level.victory) {
             this.renderVictory(ctx, level.victory.x, level.victory.y);
+        }
+
+        if (level.monsters) {
+            for (let i = 0; i < level.monsters.length; i++) {
+                const monster = level.monsters[i];
+                const selected = this.state.getSelection().type === 'monster' &&
+                               this.state.getSelection().index === i;
+                this.renderMonster(ctx, monster.x, monster.y, selected);
+            }
+        }
+
+        if (level.coins) {
+            for (let i = 0; i < level.coins.length; i++) {
+                const coin = level.coins[i];
+                const selected = this.state.getSelection().type === 'coin' &&
+                               this.state.getSelection().index === i;
+                this.renderCoin(ctx, coin.x, coin.y, selected);
+            }
         }
 
         if (this.showJumpArc) {
@@ -288,41 +297,6 @@ export class EditorCanvas {
         ctx.fillText('SPAWN', screen.x, screen.y - size - 4 * this.zoom);
     }
 
-    private renderLadder(
-        ctx: CanvasRenderingContext2D,
-        x: number,
-        y: number,
-        height: number,
-        selected: boolean
-    ): void {
-        const ladderWidth = 32;
-        const screen = this.worldToScreen(x, y);
-        const screenW = ladderWidth * this.zoom;
-        const screenH = height * this.zoom;
-
-        // Draw ladder rails
-        ctx.fillStyle = selected ? '#a07040' : '#8b5a2b';
-        ctx.fillRect(screen.x, screen.y, screenW, screenH);
-
-        // Draw rungs
-        const rungSpacing = 32 * this.zoom;
-        ctx.strokeStyle = selected ? '#c09060' : '#a06030';
-        ctx.lineWidth = 3;
-        for (let ry = screen.y + rungSpacing; ry < screen.y + screenH; ry += rungSpacing) {
-            ctx.beginPath();
-            ctx.moveTo(screen.x + 2, ry);
-            ctx.lineTo(screen.x + screenW - 2, ry);
-            ctx.stroke();
-        }
-
-        // Selection outline
-        if (selected) {
-            ctx.strokeStyle = '#ffcc00';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(screen.x, screen.y, screenW, screenH);
-        }
-    }
-
     private renderMovingPlatform(
         ctx: CanvasRenderingContext2D,
         mp: { width: number; height: number; path: { x: number; y: number }[]; speed?: number },
@@ -398,7 +372,65 @@ export class EditorCanvas {
         ctx.fillStyle = '#ffffff';
         ctx.font = `${12 * this.zoom}px sans-serif`;
         ctx.textAlign = 'center';
-        ctx.fillText('VICTORY', screen.x, screen.y - size - 4 * this.zoom);
+        ctx.fillText('CHEST', screen.x, screen.y - size - 4 * this.zoom);
+    }
+
+    private renderMonster(ctx: CanvasRenderingContext2D, x: number, y: number, selected: boolean): void {
+        const screen = this.worldToScreen(x, y);
+        const size = 40 * this.zoom;
+
+        // Draw monster body (red rectangle)
+        ctx.fillStyle = selected ? '#e05050' : '#c83232';
+        ctx.fillRect(screen.x - size / 2, screen.y - size, size, size);
+
+        // Eyes
+        ctx.fillStyle = '#ffffff';
+        const eyeSize = 8 * this.zoom;
+        ctx.fillRect(screen.x - size / 4 - eyeSize / 2, screen.y - size * 0.7, eyeSize, eyeSize);
+        ctx.fillRect(screen.x + size / 4 - eyeSize / 2, screen.y - size * 0.7, eyeSize, eyeSize);
+
+        // Pupils
+        ctx.fillStyle = '#000000';
+        const pupilSize = 4 * this.zoom;
+        ctx.fillRect(screen.x - size / 4, screen.y - size * 0.65, pupilSize, pupilSize);
+        ctx.fillRect(screen.x + size / 4 - pupilSize / 2, screen.y - size * 0.65, pupilSize, pupilSize);
+
+        if (selected) {
+            ctx.strokeStyle = '#ff8a8a';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(screen.x - size / 2, screen.y - size, size, size);
+        }
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `${10 * this.zoom}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('MONSTER', screen.x, screen.y - size - 4 * this.zoom);
+    }
+
+    private renderCoin(ctx: CanvasRenderingContext2D, x: number, y: number, selected: boolean): void {
+        const screen = this.worldToScreen(x, y);
+        const radius = 12 * this.zoom;
+
+        // Draw coin (yellow circle)
+        ctx.fillStyle = selected ? '#ffd700' : '#daa520';
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y - radius, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Inner detail
+        ctx.strokeStyle = selected ? '#ffec8a' : '#b8860b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y - radius, radius * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+
+        if (selected) {
+            ctx.strokeStyle = '#ffec8a';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(screen.x, screen.y - radius, radius + 3, 0, Math.PI * 2);
+            ctx.stroke();
+        }
     }
 
     getZoom(): number {

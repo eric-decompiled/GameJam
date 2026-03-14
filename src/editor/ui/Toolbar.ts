@@ -25,7 +25,9 @@ export class Toolbar {
                 <button data-tool="select" class="${activeTool === 'select' ? 'active' : ''}" title="Select/Draw (V)">Edit</button>
                 <button data-tool="moving" class="${activeTool === 'moving' ? 'active' : ''}" title="Moving Platform (M)">Moving</button>
                 <button data-tool="spawn" class="${activeTool === 'spawn' ? 'active' : ''}" title="Spawn tool (S)">Spawn</button>
-                <button data-tool="victory" class="${activeTool === 'victory' ? 'active' : ''}" title="Victory tool (G)">Victory</button>
+                <button data-tool="victory" class="${activeTool === 'victory' ? 'active' : ''}" title="Chest spawn point (G)">Chest</button>
+                <button data-tool="monster" class="${activeTool === 'monster' ? 'active' : ''}" title="Monster tool (N)">Monster</button>
+                <button data-tool="coin" class="${activeTool === 'coin' ? 'active' : ''}" title="Coin tool (C)">Coin</button>
             </div>
             <div class="toolbar-group">
                 <button id="toggleJumpArc" class="${jumpArcOn ? 'active' : ''}" title="Show jump trajectory (J)">Jump Arc</button>

@@ -49,12 +49,6 @@ export class SelectTool implements Tool {
             }
         }
 
-        const ladderIndex = this.state.getLadderAt(worldX, worldY);
-        if (ladderIndex !== null) {
-            this.state.selectLadder(ladderIndex);
-            return;
-        }
-
         const movingPlatformIndex = this.state.getMovingPlatformAt(worldX, worldY);
         if (movingPlatformIndex !== null) {
             this.state.selectMovingPlatform(movingPlatformIndex);
@@ -80,6 +74,18 @@ export class SelectTool implements Tool {
 
         if (this.state.isVictoryAt(worldX, worldY)) {
             this.state.selectVictory();
+            return;
+        }
+
+        const monsterIndex = this.state.getMonsterAt(worldX, worldY);
+        if (monsterIndex !== null) {
+            this.state.selectMonster(monsterIndex);
+            return;
+        }
+
+        const coinIndex = this.state.getCoinAt(worldX, worldY);
+        if (coinIndex !== null) {
+            this.state.selectCoin(coinIndex);
             return;
         }
 

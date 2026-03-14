@@ -1,8 +1,8 @@
-import { LevelData, PlatformData, MovingPlatformData, LadderData } from '../shared/types';
+import { LevelData, PlatformData, MovingPlatformData, MonsterData, CoinData } from '../shared/types';
 
 const STORAGE_KEY = 'editorLevel';
 
-export type SelectionType = 'platform' | 'movingPlatform' | 'ladder' | 'spawn' | 'victory' | null;
+export type SelectionType = 'platform' | 'movingPlatform' | 'spawn' | 'victory' | 'monster' | 'coin' | null;
 
 export interface Selection {
     type: SelectionType;
@@ -86,7 +86,8 @@ export class EditorState {
                 { x: 0, y: 700, width: 400, height: 100 }
             ],
             movingPlatforms: [],
-            ladders: []
+            monsters: [],
+            coins: []
         };
     }
 
@@ -118,9 +119,16 @@ export class EditorState {
         return null;
     }
 
-    getSelectedLadder(): LadderData | null {
-        if (this.selection.type === 'ladder' && this.selection.index !== null) {
-            return this.level.ladders?.[this.selection.index] || null;
+    getSelectedMonster(): MonsterData | null {
+        if (this.selection.type === 'monster' && this.selection.index !== null) {
+            return this.level.monsters?.[this.selection.index] || null;
+        }
+        return null;
+    }
+
+    getSelectedCoin(): CoinData | null {
+        if (this.selection.type === 'coin' && this.selection.index !== null) {
+            return this.level.coins?.[this.selection.index] || null;
         }
         return null;
     }
@@ -135,8 +143,13 @@ export class EditorState {
         this.emit('selectionChange');
     }
 
-    selectLadder(index: number): void {
-        this.selection = { type: 'ladder', index };
+    selectMonster(index: number): void {
+        this.selection = { type: 'monster', index };
+        this.emit('selectionChange');
+    }
+
+    selectCoin(index: number): void {
+        this.selection = { type: 'coin', index };
         this.emit('selectionChange');
     }
 
@@ -211,27 +224,58 @@ export class EditorState {
         }
     }
 
-    addLadder(ladder: LadderData): number {
-        if (!this.level.ladders) {
-            this.level.ladders = [];
+    addMonster(monster: MonsterData): number {
+        if (!this.level.monsters) {
+            this.level.monsters = [];
         }
-        this.level.ladders.push(ladder);
-        const index = this.level.ladders.length - 1;
+        this.level.monsters.push(monster);
+        const index = this.level.monsters.length - 1;
         this.emit('change');
         return index;
     }
 
-    updateLadder(index: number, updates: Partial<LadderData>): void {
-        if (this.level.ladders && index >= 0 && index < this.level.ladders.length) {
-            Object.assign(this.level.ladders[index], updates);
+    updateMonster(index: number, updates: Partial<MonsterData>): void {
+        if (this.level.monsters && index >= 0 && index < this.level.monsters.length) {
+            Object.assign(this.level.monsters[index], updates);
             this.emit('change');
         }
     }
 
-    deleteLadder(index: number): void {
-        if (this.level.ladders && index >= 0 && index < this.level.ladders.length) {
-            this.level.ladders.splice(index, 1);
-            if (this.selection.type === 'ladder') {
+    deleteMonster(index: number): void {
+        if (this.level.monsters && index >= 0 && index < this.level.monsters.length) {
+            this.level.monsters.splice(index, 1);
+            if (this.selection.type === 'monster') {
+                if (this.selection.index === index) {
+                    this.clearSelection();
+                } else if (this.selection.index !== null && this.selection.index > index) {
+                    this.selection.index--;
+                }
+            }
+            this.emit('change');
+        }
+    }
+
+    addCoin(coin: CoinData): number {
+        if (!this.level.coins) {
+            this.level.coins = [];
+        }
+        this.level.coins.push(coin);
+        const index = this.level.coins.length - 1;
+        this.emit('change');
+        return index;
+    }
+
+    updateCoin(index: number, updates: Partial<CoinData>): void {
+        if (this.level.coins && index >= 0 && index < this.level.coins.length) {
+            Object.assign(this.level.coins[index], updates);
+            this.emit('change');
+        }
+    }
+
+    deleteCoin(index: number): void {
+        if (this.level.coins && index >= 0 && index < this.level.coins.length) {
+            this.level.coins.splice(index, 1);
+            if (this.selection.type === 'coin') {
                 if (this.selection.index === index) {
                     this.clearSelection();
                 } else if (this.selection.index !== null && this.selection.index > index) {
@@ -340,19 +384,6 @@ export class EditorState {
         return null;
     }
 
-    getLadderAt(worldX: number, worldY: number): number | null {
-        if (!this.level.ladders) return null;
-        const ladderWidth = 32; // Visual width of ladder
-        for (let i = this.level.ladders.length - 1; i >= 0; i--) {
-            const ladder = this.level.ladders[i];
-            if (worldX >= ladder.x && worldX <= ladder.x + ladderWidth &&
-                worldY >= ladder.y && worldY <= ladder.y + ladder.height) {
-                return i;
-            }
-        }
-        return null;
-    }
-
     isSpawnAt(worldX: number, worldY: number): boolean {
         const spawnSize = 32;
         const spawn = this.level.spawn;
@@ -366,5 +397,31 @@ export class EditorState {
         const victory = this.level.victory;
         return worldX >= victory.x - size / 2 && worldX <= victory.x + size / 2 &&
                worldY >= victory.y - size && worldY <= victory.y;
+    }
+
+    getMonsterAt(worldX: number, worldY: number): number | null {
+        if (!this.level.monsters) return null;
+        const monsterSize = 40; // Visual size of monster
+        for (let i = this.level.monsters.length - 1; i >= 0; i--) {
+            const monster = this.level.monsters[i];
+            if (worldX >= monster.x - monsterSize / 2 && worldX <= monster.x + monsterSize / 2 &&
+                worldY >= monster.y - monsterSize && worldY <= monster.y) {
+                return i;
+            }
+        }
+        return null;
+    }
+
+    getCoinAt(worldX: number, worldY: number): number | null {
+        if (!this.level.coins) return null;
+        const coinSize = 24; // Visual size of coin
+        for (let i = this.level.coins.length - 1; i >= 0; i--) {
+            const coin = this.level.coins[i];
+            if (worldX >= coin.x - coinSize / 2 && worldX <= coin.x + coinSize / 2 &&
+                worldY >= coin.y - coinSize && worldY <= coin.y) {
+                return i;
+            }
+        }
+        return null;
     }
 }

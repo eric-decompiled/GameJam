@@ -25,23 +25,11 @@ export class Player extends Entity {
     jumpBufferTimer: number = 0;
     wasGrounded: boolean = false;
 
-    // Climbing state
-    isClimbing: boolean = false;
-    onLadder: boolean = false;
-    ladderX: number = 0; // X position of current ladder
-    climbDirection: number = 0;
-    private climbStarting: boolean = false;
-    private climbStartDone: boolean = false;
-    private inClimbAnimation: boolean = false;
-    private readonly CLIMB_SPEED: number = 150;
-
     private mixer: THREE.AnimationMixer | null = null;
     private idleAction: THREE.AnimationAction | null = null;
     private walkAction: THREE.AnimationAction | null = null;
     private runAction: THREE.AnimationAction | null = null;
     private jumpAction: THREE.AnimationAction | null = null;
-    private climbStartAction: THREE.AnimationAction | null = null;
-    private climbAction: THREE.AnimationAction | null = null;
     private currentAction: THREE.AnimationAction | null = null;
     private playerModel: THREE.Object3D | null = null;
     private clock: THREE.Clock = new THREE.Clock();
@@ -76,7 +64,7 @@ export class Player extends Entity {
         return this.mesh;
     }
 
-    private getModelPaths(): { idle: string; walk: string; run: string; jump: string; climbStart?: string; climbCont?: string } {
+    private getModelPaths(): { idle: string; walk: string; run: string; jump: string } {
         const base = import.meta.env.BASE_URL;
         if (this.playerId === 1) {
             // Player 2 models
@@ -85,7 +73,6 @@ export class Player extends Entity {
                 walk: `${base}models/p2_walk.glb`,
                 run: `${base}models/p2_run.glb`,
                 jump: `${base}models/p2_jump.glb`
-                // No climb animations for P2 yet
             };
         }
         // Player 1 models
@@ -93,9 +80,7 @@ export class Player extends Entity {
             idle: `${base}models/idle.glb`,
             walk: `${base}models/Walk.glb`,
             run: `${base}models/run.glb`,
-            jump: `${base}models/jump.glb`,
-            climbStart: `${base}models/Climb_start.glb`,
-            climbCont: `${base}models/Climb_Cont.glb`
+            jump: `${base}models/jump.glb`
         };
     }
 
@@ -175,29 +160,6 @@ export class Player extends Entity {
                 this.jumpAction.clampWhenFinished = true;
             }
 
-            // Load climb animations (P1 only for now)
-            if (paths.climbStart && paths.climbCont) {
-                const climbStartGltf = await gltfLoader.loadAsync(paths.climbStart);
-                if (climbStartGltf.animations.length > 0) {
-                    this.climbStartAction = this.mixer.clipAction(climbStartGltf.animations[0]);
-                    this.climbStartAction.setLoop(THREE.LoopOnce, 1);
-                    this.climbStartAction.clampWhenFinished = true;
-                }
-
-                const climbContGltf = await gltfLoader.loadAsync(paths.climbCont);
-                if (climbContGltf.animations.length > 0) {
-                    this.climbAction = this.mixer.clipAction(climbContGltf.animations[0]);
-                }
-
-                // Listen for climb start animation to finish
-                this.mixer.addEventListener('finished', (e) => {
-                    if (e.action === this.climbStartAction) {
-                        this.climbStarting = false;
-                        this.climbStartDone = true;
-                    }
-                });
-            }
-
             // Start with idle
             if (this.idleAction) {
                 this.idleAction.play();
@@ -232,48 +194,7 @@ export class Player extends Entity {
             this.moveDirection = 0;
         }
 
-        // Climbing input
-        if (this.onLadder) {
-            const vertDir = input.getVerticalAxis();
-
-            // Start climbing when pressing up/down
-            if (vertDir !== 0 && !this.isClimbing) {
-                this.isClimbing = true;
-                // Snap to ladder center
-                this.position.x = this.ladderX;
-                this.velocity.x = 0;
-                // Only play climb start once per ladder
-                if (!this.climbStartDone) {
-                    this.climbStarting = true;
-                    if (this.climbStartAction) {
-                        this.climbStartAction.reset();
-                    }
-                }
-            }
-
-            // Update climb direction (can be 0 when not pressing)
-            this.climbDirection = vertDir;
-
-            // Jump off ladder
-            if (input.isJumpJustPressed() && this.isClimbing) {
-                this.isClimbing = false;
-                this.climbStarting = false;
-                this.climbStartDone = false;
-                this.inClimbAnimation = false;
-                this.velocity.y = -PLAYER.JUMP_FORCE * 0.7;
-                this.jumpBufferTimer = 0;
-                return;
-            }
-        } else {
-            // Left the ladder - reset climb state
-            this.isClimbing = false;
-            this.climbStarting = false;
-            this.climbStartDone = false;
-            this.inClimbAnimation = false;
-            this.climbDirection = 0;
-        }
-
-        if (!this.isClimbing && input.isJumpJustPressed()) {
+        if (input.isJumpJustPressed()) {
             this.jumpBufferTimer = PLAYER.JUMP_BUFFER_TIME;
         }
 
@@ -283,19 +204,6 @@ export class Player extends Entity {
     }
 
     update(dt: number): void {
-        // Climbing movement
-        if (this.isClimbing) {
-            this.velocity.x = 0;
-
-            // Reduced movement during climb start animation
-            if (this.climbStarting) {
-                this.velocity.y = this.climbDirection * this.CLIMB_SPEED * 0.2;
-            } else {
-                this.velocity.y = this.climbDirection * this.CLIMB_SPEED;
-            }
-            return;
-        }
-
         if (this.moveDirection !== 0) {
             this.velocity.x += this.moveDirection * PLAYER.ACCELERATION * dt;
             if (Math.abs(this.velocity.x) > PLAYER.MAX_SPEED) {
@@ -338,24 +246,7 @@ export class Player extends Entity {
         }
 
         // Switch animation based on state
-        if (this.isClimbing) {
-            // Play climb start once, then switch to climb
-            if (this.climbStarting && this.climbStartAction) {
-                if (!this.inClimbAnimation) {
-                    console.log('Starting climb animation');
-                    this.switchAnimation(this.climbStartAction);
-                    this.inClimbAnimation = true;
-                }
-            } else if (this.climbStartDone && this.climbAction) {
-                // Only switch to climb action once after climb start finishes
-                if (this.currentAction !== this.climbAction) {
-                    console.log('Switching to continuous climb');
-                    this.switchAnimation(this.climbAction);
-                }
-                // Pause/unpause based on direction
-                this.climbAction.paused = this.climbDirection === 0;
-            }
-        } else if (!this.grounded && this.jumpAction) {
+        if (!this.grounded && this.jumpAction) {
             this.switchAnimation(this.jumpAction);
         } else {
             const speed = Math.abs(this.velocity.x);
@@ -372,13 +263,7 @@ export class Player extends Entity {
 
         // Rotate to face direction
         if (this.mesh) {
-            let targetRotation: number;
-            if (this.isClimbing) {
-                // Face into the ladder (back to camera)
-                targetRotation = Math.PI / 2;
-            } else {
-                targetRotation = this.facingRight ? Math.PI : 0;
-            }
+            const targetRotation = this.facingRight ? Math.PI : 0;
             this.mesh.rotation.y += (targetRotation - this.mesh.rotation.y) * 0.2;
         }
         this.updateMeshPosition();
@@ -394,42 +279,7 @@ export class Player extends Entity {
             this.moveDirection = 0;
         }
 
-        // Climbing input
-        if (this.onLadder) {
-            const vertDir = (input.down ? 1 : 0) - (input.up ? 1 : 0);
-
-            if (vertDir !== 0 && !this.isClimbing) {
-                this.isClimbing = true;
-                this.position.x = this.ladderX;
-                this.velocity.x = 0;
-                if (!this.climbStartDone) {
-                    this.climbStarting = true;
-                    if (this.climbStartAction) {
-                        this.climbStartAction.reset();
-                    }
-                }
-            }
-
-            this.climbDirection = vertDir;
-
-            if (input.jumpJustPressed && this.isClimbing) {
-                this.isClimbing = false;
-                this.climbStarting = false;
-                this.climbStartDone = false;
-                this.inClimbAnimation = false;
-                this.velocity.y = -PLAYER.JUMP_FORCE * 0.7;
-                this.jumpBufferTimer = 0;
-                return;
-            }
-        } else {
-            this.isClimbing = false;
-            this.climbStarting = false;
-            this.climbStartDone = false;
-            this.inClimbAnimation = false;
-            this.climbDirection = 0;
-        }
-
-        if (!this.isClimbing && input.jumpJustPressed) {
+        if (input.jumpJustPressed) {
             this.jumpBufferTimer = PLAYER.JUMP_BUFFER_TIME;
         }
 
@@ -446,8 +296,6 @@ export class Player extends Entity {
         this.velocity.y = state.vy;
         this.grounded = state.grounded;
         this.facingRight = state.facingRight;
-        this.isClimbing = state.isClimbing;
-        this.climbDirection = state.climbDirection;
     }
 
     // Get current state for network broadcast
@@ -460,14 +308,11 @@ export class Player extends Entity {
             vy: this.velocity.y,
             grounded: this.grounded,
             facingRight: this.facingRight,
-            isClimbing: this.isClimbing,
-            climbDirection: this.climbDirection,
             animState: this.getAnimState()
         };
     }
 
-    private getAnimState(): 'idle' | 'walk' | 'run' | 'jump' | 'climb' {
-        if (this.isClimbing) return 'climb';
+    private getAnimState(): 'idle' | 'walk' | 'run' | 'jump' {
         if (!this.grounded) return 'jump';
         const speed = Math.abs(this.velocity.x);
         const runThreshold = PLAYER.MAX_SPEED * 0.7;

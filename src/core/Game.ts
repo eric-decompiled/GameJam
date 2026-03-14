@@ -8,7 +8,6 @@ import { LevelManager } from '../levels/LevelManager';
 import { Player } from '../entities/Player';
 import { Entity } from '../entities/Entity';
 import { Platform } from '../entities/Platform';
-import { Ladder } from '../entities/Ladder';
 import { Victory } from '../entities/Victory';
 import { Monster } from '../entities/Monster';
 import { Coin } from '../entities/Coin';
@@ -159,8 +158,19 @@ export class Game {
 
     private updateCoinHud(): void {
         if (this.coinHud) {
-            this.coinHud.textContent = `Coins: ${this.coinsCollected}`;
-            this.coinHud.style.display = 'block';
+            const total = this.coins.length;
+            if (total > 0) {
+                if (this.coinsCollected >= total) {
+                    this.coinHud.textContent = `All coins collected!`;
+                    this.coinHud.style.color = '#4ad97a';
+                } else {
+                    this.coinHud.textContent = `Coins: ${this.coinsCollected}/${total}`;
+                    this.coinHud.style.color = '#ffffff';
+                }
+                this.coinHud.style.display = 'block';
+            } else {
+                this.coinHud.style.display = 'none';
+            }
         }
     }
 
@@ -409,15 +419,14 @@ export class Game {
         this.deathY = bounds.height + 200;
         this.victoryPoint = this.levelManager.getVictoryPoint();
 
-        // Create chest at victory point instead of victory marker
-        if (this.victoryPoint) {
+        // Spawn coins (monsters spawn when escape sequence activates)
+        this.spawnCoins();
+
+        // Spawn chest immediately if no coins, otherwise wait for all coins
+        if (this.coins.length === 0 && this.victoryPoint) {
             this.chest = new Chest(this.victoryPoint.x, this.victoryPoint.y);
             this.entities.push(this.chest);
         }
-
-        // Spawn monsters and coins
-        this.spawnMonsters();
-        this.spawnCoins();
 
         for (const entity of this.entities) {
             entity.createMesh();
@@ -431,13 +440,29 @@ export class Game {
 
     private spawnMonsters(): void {
         const platforms = this.entities.filter(e => e.hasTag('platform')) as Platform[];
+        const levelMonsters = this.levelManager.getMonsters();
 
-        // Find eligible platforms (wider than 200px, not spawn platform)
+        // If level has defined monsters, use those positions
+        if (levelMonsters.length > 0) {
+            for (const monsterData of levelMonsters) {
+                // Find platform at or near the monster's position
+                const platform = this.findPlatformAt(platforms, monsterData.x, monsterData.y);
+                if (platform) {
+                    const monster = new Monster(platform);
+                    // Position monster at the specified X (adjusted for monster width)
+                    monster.position.x = monsterData.x - monster.width / 2;
+                    this.monsters.push(monster);
+                    this.entities.push(monster);
+                }
+            }
+            return;
+        }
+
+        // Fall back to random spawning if no level-defined monsters
         const eligiblePlatforms = platforms.filter(p =>
             p.width >= 200 && !p.hasTag('spawn-platform')
         );
 
-        // Spawn only 1 monster on a random eligible platform
         if (eligiblePlatforms.length > 0) {
             const platform = eligiblePlatforms[Math.floor(Math.random() * eligiblePlatforms.length)];
             const monster = new Monster(platform);
@@ -446,20 +471,62 @@ export class Game {
         }
     }
 
+    private findPlatformAt(platforms: Platform[], x: number, y: number): Platform | null {
+        // Find platform below the given position (within reasonable range)
+        const searchRange = 100;
+        let bestPlatform: Platform | null = null;
+        let bestDistance = Infinity;
+
+        for (const platform of platforms) {
+            // Check if x is within platform bounds
+            if (x >= platform.position.x && x <= platform.position.x + platform.width) {
+                // Check if platform is at or below y position
+                const distance = platform.position.y - y;
+                if (distance >= 0 && distance < searchRange && distance < bestDistance) {
+                    bestDistance = distance;
+                    bestPlatform = platform;
+                }
+            }
+        }
+
+        return bestPlatform;
+    }
+
     private spawnCoins(): void {
+        const levelCoins = this.levelManager.getCoins();
+
+        // If level has defined coins, use those positions
+        if (levelCoins.length > 0) {
+            for (const coinData of levelCoins) {
+                const coin = new Coin(coinData.x - 12, coinData.y - 24);
+                this.coins.push(coin);
+                this.entities.push(coin);
+            }
+            return;
+        }
+
+        // Fall back to random spawning if no level-defined coins
         const platforms = this.entities.filter(e => e.hasTag('platform')) as Platform[];
 
-        // 20% chance to spawn a coin on each platform
         for (const platform of platforms) {
-            if (platform.hasTag('spawn-platform')) continue; // Skip spawn platform
-            if (Math.random() > 0.2) continue; // 20% chance
+            if (platform.hasTag('spawn-platform')) continue;
+            if (Math.random() > 0.2) continue;
 
             const x = platform.position.x + platform.width / 2 - 12;
-            const y = platform.position.y - 50; // Float above platform
+            const y = platform.position.y - 50;
             const coin = new Coin(x, y);
             this.coins.push(coin);
             this.entities.push(coin);
         }
+    }
+
+    private spawnChest(): void {
+        if (!this.victoryPoint || this.chest) return;
+
+        this.chest = new Chest(this.victoryPoint.x, this.victoryPoint.y);
+        this.entities.push(this.chest);
+        this.chest.createMesh();
+        this.chest.addToScene(this.renderer);
     }
 
     private setupLevelMultiplayer(playerCount: number): void {
@@ -503,15 +570,14 @@ export class Game {
         this.deathY = bounds.height + 200;
         this.victoryPoint = this.levelManager.getVictoryPoint();
 
-        // Create chest at victory point instead of victory marker
-        if (this.victoryPoint) {
+        // Spawn coins (monsters spawn when escape sequence activates)
+        this.spawnCoins();
+
+        // Spawn chest immediately if no coins, otherwise wait for all coins
+        if (this.coins.length === 0 && this.victoryPoint) {
             this.chest = new Chest(this.victoryPoint.x, this.victoryPoint.y);
             this.entities.push(this.chest);
         }
-
-        // Spawn monsters and coins
-        this.spawnMonsters();
-        this.spawnCoins();
 
         for (const entity of this.entities) {
             entity.createMesh();
@@ -564,7 +630,6 @@ export class Game {
 
     private updateAsHostOrSingle(dt: number): void {
         const platforms = this.entities.filter(e => e.hasTag('platform')) as Platform[];
-        const ladders = this.entities.filter(e => e.hasTag('ladder')) as Ladder[];
 
         // Handle input for each player
         for (const player of this.players) {
@@ -589,7 +654,7 @@ export class Game {
 
         // Run physics for each player
         for (const player of this.players) {
-            this.physics.update(player, platforms, dt, ladders);
+            this.physics.update(player, platforms, dt);
 
             // Check for death
             if (player.position.y > this.deathY) {
@@ -616,6 +681,11 @@ export class Game {
                     coin.collect();
                     this.coinsCollected++;
                     this.updateCoinHud();
+
+                    // Check if all coins collected - spawn the chest
+                    if (this.coinsCollected >= this.coins.length && !this.chest && this.victoryPoint) {
+                        this.spawnChest();
+                    }
                 }
             }
         }
@@ -878,38 +948,17 @@ export class Game {
             this.returnBase.show();
         }
 
-        // Find platform closest to spawn point to spawn a monster
-        if (!this.spawnPoint) return;
+        // Spawn all monsters now (they only appear during escape)
+        this.spawnMonsters();
 
-        let nearestPlatform: Platform | null = null;
-        let nearestDist = Infinity;
-
-        for (const platform of platforms) {
-            // Skip spawn platform itself
-            if (platform.hasTag('spawn-platform')) continue;
-            // Need platform wide enough for monster
-            if (platform.width < 200) continue;
-
-            const dx = platform.centerX - this.spawnPoint.x;
-            const dy = platform.centerY - this.spawnPoint.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            // Find closest platform that's not too close (give players some space)
-            if (dist > 100 && dist < nearestDist) {
-                nearestDist = dist;
-                nearestPlatform = platform;
-            }
-        }
-
-        // Spawn a monster on that platform
-        if (nearestPlatform) {
-            const monster = new Monster(nearestPlatform);
-            this.monsters.push(monster);
-            this.entities.push(monster);
+        // Create meshes and add to scene for newly spawned monsters
+        for (const monster of this.monsters) {
             monster.createMesh();
             monster.addToScene(this.renderer);
+        }
 
-            // Play roar sound for dramatic effect
+        // Play roar sound for dramatic effect
+        if (this.monsters.length > 0) {
             AudioManager.play('monster_roar', 0.7);
         }
     }

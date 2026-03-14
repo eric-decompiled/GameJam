@@ -24,9 +24,7 @@ export interface PlayerState {
     vy: number;
     grounded: boolean;
     facingRight: boolean;
-    isClimbing: boolean;
-    climbDirection: number;
-    animState: 'idle' | 'walk' | 'run' | 'jump' | 'climb';
+    animState: 'idle' | 'walk' | 'run' | 'jump';
 }
 
 export interface StateMessage {

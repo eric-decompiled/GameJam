@@ -1,14 +1,11 @@
 import { PHYSICS } from '../utils/constants';
 import { Player } from '../entities/Player';
 import { Platform, MovingPlatform } from '../entities/Platform';
-import { Ladder } from '../entities/Ladder';
 
 export class Physics {
     private epsilon: number = 0.001;
 
-    update(player: Player, platforms: Platform[], dt: number, ladders: Ladder[] = []): void {
-        // Check ladder overlap
-        player.onLadder = this.checkLadderOverlap(player, ladders);
+    update(player: Player, platforms: Platform[], dt: number): void {
         // Handle moving platform carrying
         if (player.standingOnPlatform && player.standingOnPlatform.hasTag('moving')) {
             const movingPlatform = player.standingOnPlatform as MovingPlatform;
@@ -20,8 +17,8 @@ export class Physics {
         // Store if we were grounded before this frame
         const wasGrounded = player.grounded;
 
-        // Only apply gravity if not grounded and not climbing
-        if (!wasGrounded && !player.isClimbing) {
+        // Only apply gravity if not grounded
+        if (!wasGrounded) {
             player.velocity.y += PHYSICS.GRAVITY * dt;
             if (player.velocity.y > PHYSICS.MAX_FALL_SPEED) {
                 player.velocity.y = PHYSICS.MAX_FALL_SPEED;
@@ -95,23 +92,5 @@ export class Physics {
                 player.velocity.y = 0;
             }
         }
-    }
-
-    private checkLadderOverlap(player: Player, ladders: Ladder[]): boolean {
-        for (const ladder of ladders) {
-            // Check if player center is within ladder bounds
-            const playerCenterX = player.position.x + player.width / 2;
-            const playerCenterY = player.position.y + player.height / 2;
-
-            if (playerCenterX >= ladder.position.x &&
-                playerCenterX <= ladder.position.x + ladder.width &&
-                playerCenterY >= ladder.position.y &&
-                playerCenterY <= ladder.position.y + ladder.height) {
-                // Store ladder X for alignment
-                player.ladderX = ladder.position.x;
-                return true;
-            }
-        }
-        return false;
     }
 }

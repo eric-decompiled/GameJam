@@ -1,24 +1,81 @@
 # Platformer Game
 
-A 3D platformer game built with TypeScript and Three.js.
+A 3D co-op platformer game built with TypeScript and Three.js.
 
 ## Tech Stack
 
 - **TypeScript** - Strict typing
 - **Three.js** - 3D rendering with perspective camera
 - **Vite** - Build tool and dev server
+- **WebSocket** - LAN multiplayer via relay server
 
 ## Architecture
 
-- `src/core/` - Game loop, input handling, debug overlay
-- `src/entities/` - Player, Platform, Ladder, Victory, base Entity class
+- `src/core/` - Game loop, input handling, debug overlay, audio, multiplayer UI
+- `src/entities/` - Player, Platform, Monster, Coin, Chest, ReturnBase
 - `src/graphics/` - Three.js renderer, camera
 - `src/physics/` - Collision detection and resolution
 - `src/levels/` - Level loading from JSON
+- `src/network/` - WebSocket networking (NetworkManager, HostSession, ClientSession, Protocol)
 - `src/editor/` - Level editor (2D canvas-based)
 - `public/levels/` - Level data files
+- `public/models/` - GLB 3D models
+- `public/audio/` - Music and sound effects
+
+## Game Modes
+
+### Single Player
+- Character select (Carl or Lisa)
+- Full gameplay with chest mechanic
+
+### Multiplayer (2-Player Co-op)
+- WebSocket-based LAN multiplayer
+- Host creates room with 6-character code
+- Client joins with code
+- Player 1 (host) is authoritative - runs physics
+- State broadcast at 20Hz, input at 60Hz
 
 ## Key Systems
+
+### Chest Mechanic (Victory Condition)
+- Chest spawns after **all coins are collected** (or immediately if no coins)
+- Chest spawns at level's chest point (set in editor)
+- Players must carry chest back to spawn point
+- **Single player**: 1 player can carry
+- **Multiplayer**: Both players must be near chest (80px) to carry
+- Chest has physics (gravity, platform collision)
+- If chest falls off level, respawns to nearest platform
+
+### Escape Sequence
+When chest is first picked up:
+- Background turns fiery red
+- Music switches to battle theme
+- Monster spawns near spawn point
+- Return base becomes visible (green glowing ring at spawn)
+
+### Audio System
+- `AudioManager` singleton with Web Audio API
+- Mute button in bottom-left corner
+- Music tracks:
+  - Menu music (menu_music.wav)
+  - Level music (level_music.mp3)
+  - Escape/battle music (escape_music.mp3)
+- Sound effects: monster_roar.mp3
+
+### Monsters
+- Placed in level editor or randomly spawned (1 per level if none placed)
+- **Spawn when escape sequence activates** (chest picked up)
+- Patrol on their platform
+- Chase player when on same platform
+- Kill player on contact
+- Player can stomp to kill (jump on head)
+
+### Coins
+- Placed in level editor or randomly spawned (20% per platform if none placed)
+- Spin and bob animation
+- Collected on player contact
+- **All coins must be collected to spawn the chest**
+- HUD shows progress: "Coins: X/Y"
 
 ### Physics
 - Physics owns gravity and grounded state
@@ -30,32 +87,18 @@ A 3D platformer game built with TypeScript and Three.js.
 
 ### 3D Models & Animation
 - Models stored in `public/models/` (GLB format)
-- **Platform**: `Platform_mk1.glb` - scaled to match platform dimensions
-- **Player animations**: `idle.glb`, `Walk.glb`, `run.glb`, `jump.glb`, `Climb_start.glb`, `Climb_Cont.glb`
-  - Walk animation plays reversed (`timeScale = -1`)
-  - Model rotated -90° Y to face +X by default
-  - Model offset -30px Y to align feet with ground
-  - Model scaled 2x for visibility (larger than hitbox)
-- Animation thresholds:
-  - Idle: speed <= 10
-  - Walk: speed > 10
-  - Run: speed > 70% of MAX_SPEED (210)
-  - Jump: when not grounded
-  - Climb: when on ladder and pressing up/down
-
-### Ladders & Climbing
-- Ladders defined in level JSON with x, y, height
-- Player snaps to ladder X position when climbing starts
-- Climb state machine: `climbStarting` → `climbStartDone` → continuous climb
-- `Climb_start.glb` plays once, then switches to looping `Climb_Cont.glb`
-- Climbing pauses animation when not pressing up/down
-- Jump off ladder with Space (reduced jump force)
+- **Carl (Player 1)**: `idle.glb`, `Walk.glb`, `run.glb`, `jump.glb`
+- **Lisa (Player 2)**: `p2_idle.glb`, `p2_walk.glb`, `p2_run.glb`, `p2_jump.glb`
+- **Other**: `Platform_mk1.glb`, `monster.glb`, `coin.glb`, `chest.glb`
+- Model rotation: -90° Y to face +X by default
+- Model offset: -30px Y to align feet with ground
 
 ### Level Editor
 - Accessible at `/editor.html`
 - 2D canvas with pan (scroll wheel, middle mouse, alt+click)
-- Tools: Select (also draws platforms), Spawn, Victory, Moving Platform, Ladder
+- Tools: Select (draws platforms), Moving Platform, Spawn, Chest, Monster, Coin
 - Grid snapping (32px)
+- Random Level button generates playable levels
 - Clipboard-based export/import (Copy/Paste JSON)
 - localStorage persistence, undo with Cmd/Ctrl+Z
 - Test button opens game with current level in new tab
@@ -63,10 +106,31 @@ A 3D platformer game built with TypeScript and Three.js.
 ## Commands
 
 ```bash
-npm run dev      # Start dev server (game at /, editor at /editor.html)
+npm run dev      # Start dev server + WebSocket relay (game at /, editor at /editor.html)
+npm run dev:solo # Start dev server only (no multiplayer)
+npm run server   # Start WebSocket relay server only
 npm run build    # Production build
 npm run lint:levels  # Run level linter
 ```
+
+## Files of Note
+
+### Core Game
+- `src/core/Game.ts` - Main game class, mode handling, victory logic
+- `src/core/AudioManager.ts` - Singleton audio with mute support
+- `src/core/MultiplayerUI.ts` - Menu screens, character select, credits
+
+### Entities
+- `src/entities/Player.ts` - Player with multiplayer support (playerId, isRemote)
+- `src/entities/Chest.ts` - Carryable chest with physics
+- `src/entities/ReturnBase.ts` - Glowing victory zone at spawn
+- `src/entities/Monster.ts` - Patrolling enemy
+- `src/entities/Coin.ts` - Collectible
+
+### Network
+- `server.js` - WebSocket relay server (port 9000)
+- `src/network/NetworkManager.ts` - WebSocket client wrapper
+- `src/network/Protocol.ts` - Message types
 
 ## Deployment
 
@@ -82,24 +146,8 @@ Deployed to GitHub Pages via GitHub Actions. Custom domain: https://gamejam.deco
 
 ---
 
-## TODO: Level Linter Fixes
+## Credits (in-game)
 
-The level linter (`src/tools/linter/`) is implemented but physics calculations need tuning:
-
-**Current state**: Runs via `npm run lint:levels`, reports 3/10 platforms reachable on level1
-
-**Issues to investigate**:
-1. Running jump trajectory check may be too conservative - platforms that overlap horizontally but require running to the edge before jumping aren't being detected
-2. Need to handle case where player can run along platform, build momentum, then jump at edge to reach higher platforms that overlap
-3. May need to add "edge jump" as distinct from standing jump - player at edge of src can reach platforms slightly beyond MAX_JUMP_HEIGHT via horizontal approach
-
-**Files**:
-- `src/tools/linter/physics.ts` - canReach(), checkRunningJump(), checkTrajectory()
-- `src/tools/linter/graph.ts` - BFS reachability
-- `src/tools/linter/index.ts` - CLI entry point
-
-**Physics constants** (from constants.ts):
-- JUMP_FORCE: 700 → MAX_JUMP_HEIGHT: ~136px
-- GRAVITY: 1800
-- MAX_SPEED: 300
-- COYOTE_TIME: 100ms
+- **Menu music**: Cleyton Kauffman (soundcloud.com/cleytonkauffman)
+- **Adventure music**: Ievgen Poltavskyi from Pixabay
+- **Battle theme**: Cynic Music (cynicmusic.com | pixelsphere.org)
