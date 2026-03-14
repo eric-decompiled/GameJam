@@ -60,15 +60,19 @@ When chest is first picked up:
   - Menu music (menu_music.wav)
   - Level music (level_music.mp3)
   - Escape/battle music (escape_music.mp3)
-- Sound effects: monster_roar.mp3
+- Sound effects:
+  - monster_roar.mp3 - When monster starts chasing
+  - coin.mp3 - Coin collection
+  - victory.mp3 - Victory fanfare
 
 ### Monsters
 - Placed in level editor or randomly spawned (1 per level if none placed)
 - **Spawn when escape sequence activates** (chest picked up)
-- Patrol on their platform
+- Patrol on their platform, **avoid spawn point area**
 - Chase player when on same platform
 - Kill player on contact
 - Player can stomp to kill (jump on head)
+- **2-Player mode**: Red weak spot appears on back when chasing - other player can attack from behind
 
 ### Coins
 - Placed in level editor or randomly spawned (20% per platform if none placed)
@@ -88,10 +92,15 @@ When chest is first picked up:
 ### 3D Models & Animation
 - Models stored in `public/models/` (GLB format)
 - **Carl (Player 1)**: `idle.glb`, `Walk.glb`, `run.glb`, `jump.glb`
-- **Lisa (Player 2)**: `p2_idle.glb`, `p2_walk.glb`, `p2_run.glb`, `p2_jump.glb`
+- **Lisa (Player 2)**: `p2_idle.glb`, `p2_walk.glb`, `p2_run.glb`, `p2_jump.glb` (compressed with gltf-transform)
 - **Other**: `Platform_mk1.glb`, `monster.glb`, `coin.glb`, `chest.glb`
 - Model rotation: -90° Y to face +X by default
 - Model offset: -30px Y to align feet with ground
+- To compress large models: `npx gltf-transform resize input.glb output.glb --width 1024 --height 1024`
+
+### Loading & Caching
+- Loading screen with spinner shown during startup
+- Service worker (`public/sw.js`) caches assets for faster subsequent loads
 
 ### Level Editor
 - Accessible at `/editor.html`

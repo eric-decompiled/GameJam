@@ -403,6 +403,7 @@ export class Game {
         this.coinsCollected = 0;
         this.hasWon = false;
         this.levelTime = 0;
+        this.deaths = [0, 0];
         this.updateCoinHud();
         Monster.isMultiplayerMode = false;
 
@@ -912,7 +913,7 @@ export class Game {
         }
 
         // Reset deaths and time
-        this.deaths = this.players.map(() => 0);
+        this.deaths = [0, 0];
         this.levelTime = 0;
 
         // Respawn all players

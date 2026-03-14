@@ -283,6 +283,13 @@ export class MultiplayerUI {
             .mp-credits-content a:hover {
                 text-decoration: underline;
             }
+
+            .mp-warning {
+                color: #d9a84a;
+                font-size: 12px;
+                margin-top: 16px;
+                line-height: 1.4;
+            }
         `;
         document.head.appendChild(style);
     }
@@ -298,10 +305,11 @@ export class MultiplayerUI {
         overlay.className = 'mp-overlay';
         overlay.innerHTML = `
             <div class="mp-panel">
-                <h1 class="mp-title">Platformer</h1>
+                <h1 class="mp-title">Treasure Heist</h1>
                 <button class="mp-button mp-button-primary" id="mp-single">Single Player</button>
                 <button class="mp-button mp-button-success" id="mp-host">Host Game</button>
                 <button class="mp-button mp-button-secondary" id="mp-join">Join Game</button>
+                <p class="mp-warning">Multiplayer requires LAN connection<br>and relay server running on host</p>
                 <button class="mp-button mp-button-secondary" id="mp-edit" style="margin-top: 24px;">Level Editor</button>
             </div>
             <span class="mp-credits-link" id="mp-credits">Credits</span>
