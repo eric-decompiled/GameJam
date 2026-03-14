@@ -1,0 +1,89 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #1a1a2e;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.game-container {
+    position: relative;
+}
+
+#gameCanvas {
+    border: 4px solid #4a4a6a;
+    border-radius: 4px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+#debugOverlay {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #0f0;
+    font-family: monospace;
+    font-size: 12px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    pointer-events: none;
+    line-height: 1.6;
+}
+
+#debugOverlay .key {
+    display: inline-block;
+    min-width: 20px;
+    padding: 2px 6px;
+    margin: 1px;
+    background: #333;
+    border-radius: 3px;
+    text-align: center;
+}
+
+#debugOverlay .key.pressed {
+    background: #0a0;
+    color: #fff;
+}
+
+.controls {
+    color: #a0a0c0;
+    text-align: center;
+    font-size: 14px;
+}
+
+.controls h3 {
+    margin-bottom: 8px;
+    color: #d0d0f0;
+}
+
+.controls span {
+    display: inline-block;
+    background: #2a2a4e;
+    padding: 4px 12px;
+    border-radius: 4px;
+    margin: 2px;
+}
+
+.controls kbd {
+    display: inline-block;
+    background: #3a3a5e;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-weight: bold;
+    color: #e0e0ff;
+}
