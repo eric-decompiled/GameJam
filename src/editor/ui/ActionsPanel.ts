@@ -24,7 +24,6 @@ export class ActionsPanel {
                 <select id="load-level">
                     <option value="">Select a level...</option>
                     <option value="level1">Level 1</option>
-                    <option value="tester">Tester</option>
                 </select>
             </div>
         `;
