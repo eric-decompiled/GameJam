@@ -43,5 +43,29 @@ Deployed to GitHub Pages via GitHub Actions. Custom domain: https://gamejam.deco
 ## Claude Instructions
 
 - **NEVER commit to git** - User will handle all git operations
-- Run `npm run dev` to test changes locally
+- **Do NOT start `npm run dev`** - User keeps it running already
 - Level data is in `public/levels/` for production builds
+
+---
+
+## TODO: Level Linter Fixes
+
+The level linter (`src/tools/linter/`) is implemented but physics calculations need tuning:
+
+**Current state**: Runs via `npm run lint:levels`, reports 3/10 platforms reachable on level1
+
+**Issues to investigate**:
+1. Running jump trajectory check may be too conservative - platforms that overlap horizontally but require running to the edge before jumping aren't being detected
+2. Need to handle case where player can run along platform, build momentum, then jump at edge to reach higher platforms that overlap
+3. May need to add "edge jump" as distinct from standing jump - player at edge of src can reach platforms slightly beyond MAX_JUMP_HEIGHT via horizontal approach
+
+**Files**:
+- `src/tools/linter/physics.ts` - canReach(), checkRunningJump(), checkTrajectory()
+- `src/tools/linter/graph.ts` - BFS reachability
+- `src/tools/linter/index.ts` - CLI entry point
+
+**Physics constants** (from constants.ts):
+- JUMP_FORCE: 700 → MAX_JUMP_HEIGHT: ~136px
+- GRAVITY: 1800
+- MAX_SPEED: 300
+- COYOTE_TIME: 100ms
