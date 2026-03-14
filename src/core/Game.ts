@@ -422,6 +422,15 @@ export class Game {
         // Spawn coins (monsters spawn when escape sequence activates)
         this.spawnCoins();
 
+        // TEST: Spawn a monster on the second platform (by X position) for animation testing
+        const testPlatforms = (this.entities.filter(e => e.hasTag('platform')) as Platform[])
+            .sort((a, b) => a.position.x - b.position.x);
+        if (testPlatforms.length >= 2) {
+            const testMonster = new Monster(testPlatforms[1]);
+            this.monsters.push(testMonster);
+            this.entities.push(testMonster);
+        }
+
         // Spawn chest immediately if no coins, otherwise wait for all coins
         if (this.coins.length === 0 && this.victoryPoint) {
             this.chest = new Chest(this.victoryPoint.x, this.victoryPoint.y);

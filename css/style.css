@@ -118,22 +118,6 @@ body {
     margin-top: 16px;
 }
 
-.edit-btn {
-    padding: 12px 24px;
-    background: #4a6aae;
-    border: none;
-    border-radius: 4px;
-    color: #fff;
-    font-size: 14px;
-    font-weight: 600;
-    text-decoration: none;
-    cursor: pointer;
-}
-
-.edit-btn:hover {
-    background: #5a7abe;
-}
-
 .victory-overlay {
     position: fixed;
     top: 0;

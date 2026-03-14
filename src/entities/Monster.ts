@@ -17,6 +17,7 @@ export class Monster extends Entity {
     private walkAction: THREE.AnimationAction | null = null;
     private clock: THREE.Clock = new THREE.Clock();
     private targetPlayer: Player | null = null;
+    private isChasing: boolean = false;
     isDead: boolean = false;
 
     constructor(platform: Platform) {
@@ -72,7 +73,10 @@ export class Monster extends Entity {
 
             model.position.x = -center.x;
             model.position.z = -center.z;
-            model.position.y = -box.min.y;
+            model.position.y = -box.min.y - 30;  // Lower to ground
+
+            // Rotate model to face +X by default (model faces +Z originally)
+            model.rotation.y = -Math.PI / 2;
 
             // Enable shadows
             model.traverse((child) => {
@@ -136,18 +140,20 @@ export class Monster extends Entity {
 
     // Check if player is on the same platform and set as target
     checkForPlayers(players: Player[]): void {
-        const wasChasing = this.targetPlayer !== null;
+        const wasChasing = this.isChasing;
         this.targetPlayer = null;
+        this.isChasing = false;
 
         for (const player of players) {
             if (this.isPlayerOnPlatform(player)) {
                 this.targetPlayer = player;
+                this.isChasing = true;
                 break; // Chase first player found
             }
         }
 
         // Play roar when starting to chase
-        if (!wasChasing && this.targetPlayer !== null) {
+        if (!wasChasing && this.isChasing) {
             AudioManager.play('monster_roar', 0.5);
         }
     }
@@ -203,9 +209,14 @@ export class Monster extends Entity {
             this.mixer.update(delta);
         }
 
-        // Face movement direction
+        // Adjust animation speed based on chase state
+        if (this.walkAction) {
+            this.walkAction.timeScale = this.isChasing ? 2.0 : 1.0;
+        }
+
+        // Face movement direction (match Player rotation logic)
         if (this.mesh) {
-            const targetRotation = this.direction > 0 ? 0 : Math.PI;
+            const targetRotation = this.direction > 0 ? Math.PI : 0;
             this.mesh.rotation.y += (targetRotation - this.mesh.rotation.y) * 0.2;
         }
 

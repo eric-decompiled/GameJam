@@ -20,7 +20,8 @@
       "WebFetch(domain:github.com)",
       "Bash(npm uninstall:*)",
       "Bash(open:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(sips:*)"
     ]
   }
 }

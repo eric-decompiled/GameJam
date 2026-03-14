@@ -302,6 +302,7 @@ export class MultiplayerUI {
                 <button class="mp-button mp-button-primary" id="mp-single">Single Player</button>
                 <button class="mp-button mp-button-success" id="mp-host">Host Game</button>
                 <button class="mp-button mp-button-secondary" id="mp-join">Join Game</button>
+                <button class="mp-button mp-button-secondary" id="mp-edit" style="margin-top: 24px;">Level Editor</button>
             </div>
             <span class="mp-credits-link" id="mp-credits">Credits</span>
         `;
@@ -323,6 +324,10 @@ export class MultiplayerUI {
 
         document.getElementById('mp-credits')?.addEventListener('click', () => {
             this.showCredits();
+        });
+
+        document.getElementById('mp-edit')?.addEventListener('click', () => {
+            window.location.href = '/editor.html';
         });
     }
 
