@@ -296,6 +296,7 @@ export class Player extends Entity {
         this.velocity.y = state.vy;
         this.grounded = state.grounded;
         this.facingRight = state.facingRight;
+        this.hasReachedVictory = state.hasReachedVictory;
     }
 
     // Get current state for network broadcast
@@ -308,7 +309,8 @@ export class Player extends Entity {
             vy: this.velocity.y,
             grounded: this.grounded,
             facingRight: this.facingRight,
-            animState: this.getAnimState()
+            animState: this.getAnimState(),
+            hasReachedVictory: this.hasReachedVictory
         };
     }
 

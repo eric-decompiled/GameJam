@@ -12,8 +12,9 @@ import {
 export class HostSession {
     private networkManager: NetworkManager;
     private clientInput: InputState | null = null;
-    private clientPosition: { x: number; y: number } | null = null;
     private prevJumpHeld: boolean = false;
+    private pendingJumpPress: boolean = false; // Latch for jump press - persists until consumed
+    private pendingJumpRelease: boolean = false; // Latch for jump release
     private stateSeq: number = 0;
     private clientReady: boolean = false;
     private onClientReadyCallback: (() => void) | null = null;
@@ -42,33 +43,36 @@ export class HostSession {
         const jumpJustReleased = !jumpHeld && this.prevJumpHeld;
         this.prevJumpHeld = jumpHeld;
 
+        // Latch jump press/release - don't overwrite if already pending
+        // This ensures we don't miss jump presses if multiple messages arrive between physics ticks
+        if (jumpJustPressed) {
+            this.pendingJumpPress = true;
+        }
+        if (jumpJustReleased) {
+            this.pendingJumpRelease = true;
+        }
+
         this.clientInput = {
             ...message.keys,
-            jumpJustPressed,
-            jumpJustReleased
+            jumpJustPressed: this.pendingJumpPress,
+            jumpJustReleased: this.pendingJumpRelease
         };
-
-        // Store client's reported position for collision detection
-        if (message.x !== undefined && message.y !== undefined) {
-            this.clientPosition = { x: message.x, y: message.y };
-        }
     }
 
     getClientInput(): InputState | null {
         const input = this.clientInput;
-        // Clear just-pressed/released after reading so they only fire once
+        // Clear latched jump states after reading so they only fire once
         if (this.clientInput) {
             this.clientInput = {
                 ...this.clientInput,
                 jumpJustPressed: false,
                 jumpJustReleased: false
             };
+            // Clear the latches so new jump presses can be detected
+            this.pendingJumpPress = false;
+            this.pendingJumpRelease = false;
         }
         return input;
-    }
-
-    getClientPosition(): { x: number; y: number } | null {
-        return this.clientPosition;
     }
 
     isClientReady(): boolean {

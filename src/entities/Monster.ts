@@ -208,25 +208,6 @@ export class Monster extends Entity {
         return onTop && withinBounds && player.grounded;
     }
 
-    // Check collision with player - returns 'kill' if player should die, 'stomp' if monster should die
-    checkPlayerCollision(player: Player): 'kill' | 'stomp' | null {
-        if (this.isDead) return null;
-        if (!this.intersects(player)) return null;
-
-        // Check if player is stomping (falling onto monster from above)
-        const playerBottom = player.position.y + player.height;
-        const monsterTop = this.position.y;
-        const playerFalling = player.velocity.y > 0;
-
-        // Player stomps if they're falling and their feet are near monster's head
-        if (playerFalling && playerBottom < monsterTop + 20) {
-            return 'stomp';
-        }
-
-        // Otherwise monster kills player
-        return 'kill';
-    }
-
     kill(): void {
         this.isDead = true;
         this.active = false;

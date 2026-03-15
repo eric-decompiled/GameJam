@@ -309,7 +309,7 @@ export class MultiplayerUI {
                 <button class="mp-button mp-button-primary" id="mp-single">Single Player</button>
                 <button class="mp-button mp-button-success" id="mp-host">Host Game</button>
                 <button class="mp-button mp-button-secondary" id="mp-join">Join Game</button>
-                <p class="mp-warning">Multiplayer requires LAN connection<br>and relay server running on host</p>
+                <p class="mp-warning">Multiplayer requires LAN. <a href="https://github.com/eric-decompiled/GameJam" target="_blank" style="color: #6ab0de;">Setup instructions</a></p>
                 <button class="mp-button mp-button-secondary" id="mp-edit" style="margin-top: 24px;">Level Editor</button>
             </div>
             <span class="mp-credits-link" id="mp-credits">Credits</span>

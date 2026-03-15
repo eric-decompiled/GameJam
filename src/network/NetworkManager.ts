@@ -89,7 +89,7 @@ export class NetworkManager {
 
             this.ws.onerror = () => {
                 this._state = 'error';
-                this.callbacks?.onError('Failed to connect to server');
+                this.callbacks?.onError('Failed to connect to server. Make sure relay server is running (npm run server)');
                 reject(new Error('WebSocket error'));
             };
 
@@ -137,7 +137,7 @@ export class NetworkManager {
 
             this.ws.onerror = () => {
                 this._state = 'error';
-                this.callbacks?.onError('Failed to connect to server');
+                this.callbacks?.onError('Failed to connect to server. Make sure relay server is running (npm run server)');
                 reject(new Error('WebSocket error'));
             };
 

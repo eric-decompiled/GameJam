@@ -7,7 +7,7 @@ import { Physics } from '../physics/Physics';
 import { LevelManager } from '../levels/LevelManager';
 import { Player } from '../entities/Player';
 import { Entity } from '../entities/Entity';
-import { Platform } from '../entities/Platform';
+import { Platform, MovingPlatform } from '../entities/Platform';
 import { Victory } from '../entities/Victory';
 import { Monster } from '../entities/Monster';
 import { Coin } from '../entities/Coin';
@@ -18,7 +18,7 @@ import { HostSession } from '../network/HostSession';
 import { ClientSession } from '../network/ClientSession';
 import { MultiplayerUI } from './MultiplayerUI';
 import { AudioManager } from './AudioManager';
-import type { PlayerState, WorldState } from '../network/Protocol';
+import type { PlayerState, WorldState, MovingPlatformState } from '../network/Protocol';
 
 export type GameMode = 'single' | 'host' | 'client';
 
@@ -33,6 +33,7 @@ export class Game {
     private players: Player[] = [];
     private monsters: Monster[] = [];
     private coins: Coin[] = [];
+    private movingPlatforms: MovingPlatform[] = [];
     private coinsCollected: number = 0;
     private coinHud: HTMLElement | null = null;
     private chestHud: HTMLElement | null = null;
@@ -57,7 +58,7 @@ export class Game {
     private clientSession: ClientSession | null = null;
     private multiplayerUI: MultiplayerUI;
     private stateBroadcastTimer: number = 0;
-    private readonly STATE_BROADCAST_INTERVAL: number = 1000 / 20; // 20Hz
+    private readonly STATE_BROADCAST_INTERVAL: number = 100; // 10Hz (every 100ms)
     private currentLevelName: string = 'level1';
     private selectedCharacterId: number = 0;
     private audioReady: boolean = false;
@@ -397,6 +398,7 @@ export class Game {
         this.players = [];
         this.monsters = [];
         this.coins = [];
+        this.movingPlatforms = this.entities.filter(e => e instanceof MovingPlatform) as MovingPlatform[];
         this.chest = null;
         this.chestActivated = false;
         this.renderer.setBackgroundColor(0x6ab0de, 0x4a7a4a); // Reset to normal colors
@@ -420,8 +422,9 @@ export class Game {
         this.entities.push(this.returnBase);
 
         const bounds = this.levelManager.getWorldBounds();
-        this.camera.setWorldBounds(bounds.width, bounds.height);
-        this.deathY = bounds.height + 200;
+        // Add buffer to world bounds for smoother edge behavior
+        this.camera.setWorldBounds(bounds.width + 200, bounds.height + 200);
+        this.deathY = bounds.height + 400;
         this.victoryPoint = this.levelManager.getVictoryPoint();
 
         // Spawn coins (monsters spawn when escape sequence activates)
@@ -463,13 +466,14 @@ export class Game {
             return;
         }
 
-        // Fall back to random spawning if no level-defined monsters
+        // Fall back to deterministic spawning if no level-defined monsters
+        // Always pick the first eligible platform for consistency between host/client
         const eligiblePlatforms = platforms.filter(p =>
             p.width >= 200 && !p.hasTag('spawn-platform')
         );
 
         if (eligiblePlatforms.length > 0) {
-            const platform = eligiblePlatforms[Math.floor(Math.random() * eligiblePlatforms.length)];
+            const platform = eligiblePlatforms[0];
             const monster = new Monster(platform);
             this.monsters.push(monster);
             this.entities.push(monster);
@@ -510,18 +514,23 @@ export class Game {
             return;
         }
 
-        // Fall back to random spawning if no level-defined coins
+        // Fall back to deterministic spawning if no level-defined coins
+        // Spawn on every 3rd eligible platform for consistency between host/client
         const platforms = this.entities.filter(e => e.hasTag('platform')) as Platform[];
+        let platformIndex = 0;
 
         for (const platform of platforms) {
             if (platform.hasTag('spawn-platform')) continue;
-            if (Math.random() > 0.2) continue;
 
-            const x = platform.position.x + platform.width / 2 - 12;
-            const y = platform.position.y - 50;
-            const coin = new Coin(x, y);
-            this.coins.push(coin);
-            this.entities.push(coin);
+            // Deterministic: spawn on every 3rd platform
+            if (platformIndex % 3 === 0) {
+                const x = platform.position.x + platform.width / 2 - 12;
+                const y = platform.position.y - 50;
+                const coin = new Coin(x, y);
+                this.coins.push(coin);
+                this.entities.push(coin);
+            }
+            platformIndex++;
         }
     }
 
@@ -539,6 +548,7 @@ export class Game {
         this.players = [];
         this.monsters = [];
         this.coins = [];
+        this.movingPlatforms = this.entities.filter(e => e instanceof MovingPlatform) as MovingPlatform[];
         this.chest = null;
         this.chestActivated = false;
         this.renderer.setBackgroundColor(0x6ab0de, 0x4a7a4a); // Reset to normal colors
@@ -573,8 +583,9 @@ export class Game {
         }
 
         const bounds = this.levelManager.getWorldBounds();
-        this.camera.setWorldBounds(bounds.width, bounds.height);
-        this.deathY = bounds.height + 200;
+        // Add buffer to world bounds for smoother edge behavior
+        this.camera.setWorldBounds(bounds.width + 200, bounds.height + 200);
+        this.deathY = bounds.height + 400;
         this.victoryPoint = this.levelManager.getVictoryPoint();
 
         // Spawn coins (monsters spawn when escape sequence activates)
@@ -646,12 +657,6 @@ export class Game {
                 if (remoteInput) {
                     player.handleRemoteInput(remoteInput);
                 }
-                // Use client's reported position for accurate collision detection
-                const clientPos = this.hostSession?.getClientPosition();
-                if (clientPos) {
-                    player.position.x = clientPos.x;
-                    player.position.y = clientPos.y;
-                }
             } else {
                 // Local input
                 player.handleInput(this.input);
@@ -665,13 +670,9 @@ export class Game {
             }
         }
 
-        // Run physics for each player
+        // Run physics for each player (host is authoritative for all players)
         for (const player of this.players) {
-            // Skip physics for remote players - client handles their physics
-            // Host only uses their reported position for collision detection
-            if (!player.isRemote) {
-                this.physics.update(player, platforms, dt);
-            }
+            this.physics.update(player, platforms, dt);
 
             // Check for death
             if (player.position.y > this.deathY) {
@@ -823,21 +824,15 @@ export class Game {
             }
         }
 
-        // Update remote player animations
-        if (remotePlayer) {
-            remotePlayer.update(dt);
-        }
+        // Note: Remote player doesn't need update() - their state comes from network
+        // Animation updates happen in render() via the mixer
 
         // Camera follows all players
         this.camera.followMultiple(this.players, dt);
 
-        // Send local input to host (including position for collision detection)
-        if (this.networkManager?.isConnected && localPlayer) {
-            this.clientSession?.sendInput(
-                this.input.getInputState(),
-                localPlayer.position.x,
-                localPlayer.position.y
-            );
+        // Send local input to host
+        if (this.networkManager?.isConnected) {
+            this.clientSession?.sendInput(this.input.getInputState());
         }
     }
 
@@ -847,23 +842,23 @@ export class Game {
         const dy = state.y - player.position.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        const SNAP_THRESHOLD = 150; // Large differences = snap (respawn, teleport)
-        const CORRECTION_THRESHOLD = 5; // Small differences = ignore
-        const LERP_FACTOR = 0.1; // Smooth correction rate
+        const SNAP_THRESHOLD = 200; // Large differences = snap (respawn, teleport)
+        const CORRECTION_THRESHOLD = 15; // Small differences = ignore completely
+        const LERP_FACTOR = 0.05; // Very gentle correction
 
         if (distance > SNAP_THRESHOLD) {
             // Snap to server position (respawn or major desync)
             player.applyState(state);
         } else if (distance > CORRECTION_THRESHOLD) {
-            // Smoothly correct toward server position
+            // Gently nudge position toward server - don't touch velocity or grounded!
+            // This prevents fighting with jump physics
             player.position.x += dx * LERP_FACTOR;
-            player.position.y += dy * LERP_FACTOR;
-            player.velocity.x += (state.vx - player.velocity.x) * LERP_FACTOR;
-            player.velocity.y += (state.vy - player.velocity.y) * LERP_FACTOR;
-            // Snap grounded state to avoid physics glitches
-            player.grounded = state.grounded;
+            // Only correct Y if on ground to avoid messing with jumps
+            if (player.grounded && state.grounded) {
+                player.position.y += dy * LERP_FACTOR;
+            }
         }
-        // If within CORRECTION_THRESHOLD, trust local prediction
+        // Trust local physics for velocity, grounded state, and small differences
     }
 
     private getWorldState(): WorldState {
@@ -877,15 +872,27 @@ export class Game {
             if (!monster.active) deadMonsters.push(index);
         });
 
+        // Get moving platform states (using dedicated array for consistent indexing)
+        const movingPlatformStates: MovingPlatformState[] = this.movingPlatforms.map(platform => ({
+            x: platform.position.x,
+            y: platform.position.y,
+            pathIndex: platform.currentPathIndex,
+            waiting: platform.waiting
+        }));
+
         return {
             collectedCoins,
             coinsCollected: this.coinsCollected,
             escapeMode: this.chestActivated,
             chestX: this.chest?.position.x,
             chestY: this.chest?.position.y,
+            chestVx: this.chest?.velocity.x,
+            chestVy: this.chest?.velocity.y,
             chestBeingCarried: this.chest?.isBeingCarried() ?? false,
             deadMonsters,
-            deaths: [...this.deaths]
+            deaths: [...this.deaths],
+            hasWon: this.hasWon,
+            movingPlatforms: movingPlatformStates
         };
     }
 
@@ -932,15 +939,71 @@ export class Game {
             this.spawnChest();
         }
 
-        // Sync chest position and state
+        // Sync chest position, velocity and state
         if (this.chest && world.chestX !== undefined && world.chestY !== undefined) {
             this.chest.position.x = world.chestX;
             this.chest.position.y = world.chestY;
+            if (world.chestVx !== undefined) this.chest.velocity.x = world.chestVx;
+            if (world.chestVy !== undefined) this.chest.velocity.y = world.chestVy;
         }
 
         // Sync death counts
         if (world.deaths) {
             this.deaths = [...world.deaths];
+        }
+
+        // Sync victory state
+        if (world.hasWon && !this.hasWon) {
+            this.hasWon = true;
+            this.showVictory();
+        }
+
+        // Sync moving platform positions (smooth correction using dedicated array)
+        if (world.movingPlatforms) {
+            const localPlayer = this.players.find(p => !p.isRemote);
+
+            for (let i = 0; i < this.movingPlatforms.length && i < world.movingPlatforms.length; i++) {
+                const platform = this.movingPlatforms[i];
+                const state = world.movingPlatforms[i];
+
+                // Calculate correction needed
+                const dx = state.x - platform.position.x;
+                const dy = state.y - platform.position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                let correctionX = 0;
+                let correctionY = 0;
+
+                if (distance > 50) {
+                    // Snap if too far off
+                    correctionX = dx;
+                    correctionY = dy;
+                } else if (distance > 2) {
+                    // Smooth correction
+                    correctionX = dx * 0.3;
+                    correctionY = dy * 0.3;
+                }
+
+                // Apply correction to platform
+                if (correctionX !== 0 || correctionY !== 0) {
+                    platform.position.x += correctionX;
+                    platform.position.y += correctionY;
+
+                    // Also update lastPosition to prevent erroneous deltaPosition next frame
+                    platform.lastPosition.x += correctionX;
+                    platform.lastPosition.y += correctionY;
+
+                    // If local player is standing on this platform, move them too
+                    if (localPlayer && localPlayer.standingOnPlatform === platform) {
+                        localPlayer.position.x += correctionX;
+                        localPlayer.position.y += correctionY;
+                    }
+                }
+
+                // Sync state to keep logic in sync
+                platform.currentPathIndex = state.pathIndex;
+                platform.waiting = state.waiting;
+            }
         }
     }
 

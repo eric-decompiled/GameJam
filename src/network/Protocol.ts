@@ -14,9 +14,6 @@ export interface InputMessage {
     type: 'input';
     keys: InputState;
     seq: number;
-    // Client sends their predicted position for collision detection on host
-    x?: number;
-    y?: number;
 }
 
 export interface PlayerState {
@@ -28,6 +25,14 @@ export interface PlayerState {
     grounded: boolean;
     facingRight: boolean;
     animState: 'idle' | 'walk' | 'run' | 'jump';
+    hasReachedVictory: boolean;
+}
+
+export interface MovingPlatformState {
+    x: number;
+    y: number;
+    pathIndex: number;
+    waiting: boolean;
 }
 
 export interface WorldState {
@@ -36,9 +41,13 @@ export interface WorldState {
     escapeMode: boolean;
     chestX?: number;
     chestY?: number;
+    chestVx?: number;
+    chestVy?: number;
     chestBeingCarried: boolean;
     deadMonsters: number[];  // Indices of dead monsters
     deaths: number[];  // Death counts per player
+    hasWon: boolean;
+    movingPlatforms?: MovingPlatformState[];  // Sync moving platform positions
 }
 
 export interface StateMessage {

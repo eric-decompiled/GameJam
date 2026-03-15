@@ -67,13 +67,11 @@ export class ClientSession {
         return result;
     }
 
-    sendInput(input: InputState, x?: number, y?: number): void {
+    sendInput(input: InputState): void {
         const message: InputMessage = {
             type: 'input',
             keys: input,
-            seq: this.inputSeq++,
-            x,
-            y
+            seq: this.inputSeq++
         };
         this.networkManager.send(message);
     }
